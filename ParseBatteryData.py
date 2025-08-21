@@ -16,11 +16,11 @@ capVplot_path = 'data/output/capVplots'
 dqdvplot_path = 'data/output/dqdvPlots'
 
 
-def convertdf(df, cell_tester):
+def convertdf(df, extension, filename):
     converted_df = pd.DataFrame(columns=['step_time', 'datetime', 'cycle', 'step',
                                          'status', 'current(mA)', 'voltage(V)',
                                          'charge_capacity(mAh)', 'discharge_capacity(mAh)'])
-    if cell_tester == 'Arbin':
+    if extension == '.res':
         converted_df['step_time'] = df['Step_Time']
         converted_df['datetime'] = pd.to_datetime(df['DateTime'][0], unit='d', origin=pd.Timestamp('1899-12-30'))
         converted_df['step'] = df['Step_Index']
@@ -30,19 +30,22 @@ def convertdf(df, cell_tester):
         converted_df['charge_capacity(mAh)'] = df['Charge_Capacity'] * 1000
         converted_df['discharge_capacity(mAh)'] = df['Discharge_Capacity'] * 1000
         converted_df.loc[converted_df['current(mA)'] == 0, 'status'] = 'rest'
-        converted_df.loc[converted_df['Current(mA)'] < 0, 'status'] = 'discharge'
-        converted_df.loc[converted_df['Current(mA)'] > 0, 'status'] = 'charge'
-    elif cell_tester == 'Neware':
+        converted_df.loc[converted_df['current(mA)'] < 0, 'status'] = 'discharge'
+        converted_df.loc[converted_df['current(mA)'] > 0, 'status'] = 'charge'
+    elif extension == '.ndax':
         converted_df['step_time'] = df['Time']
         converted_df['datetime'] = df['Timestamp']
         converted_df['step'] = df['Step']
         converted_df['cycle'] = df['Cycle']
-        converted_df['status'] = df['Status']
-        converted_df['current(mA)urrent(mA)'] = df['Current(mA)']
+        converted_df['current(mA)'] = df['Current(mA)']
         converted_df['voltage(V)'] = df['Voltage']
         converted_df['charge_capacity(mAh)'] = df['Charge_Capacity(mAh)']
         converted_df['discharge_capacity(mAh)'] = df['Discharge_Capacity(mAh)']
+        converted_df.loc[converted_df['current(mA)'] == 0, 'status'] = 'rest'
+        converted_df.loc[converted_df['current(mA)'] < 0, 'status'] = 'discharge'
+        converted_df.loc[converted_df['current(mA)'] > 0, 'status'] = 'charge'
     return converted_df
+
 
 def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
                    cell_data, output_path, csv_path, capVplot_path, dqdvplot_path):
@@ -50,35 +53,78 @@ def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
     cyclerange = list(range(start_cycle, end_cycle+2))
     for i in cyclelist:
         cycleDF = df.loc[df['cycle'].isin([i])]
-        steps = cycleDf['step'].unique().tolist()
+        steps = cycleDF['step'].unique().tolist()
         try:
             x = len(steps)
             if x<4:
                 raise ValueError("Incomplete Cycle")
         except ValueError:
+            print('Incomplete Cycle:' + filename)
             continue
         else:
             if cyclelist[0] == cyclerange[0]:
                 cycle = i
             else:
-                cycle = cycle_range[i - 1]
+                cycle = cyclerange[i - 1]
             current = float(abs(cycleDF.loc[cycleDF['status'] == 'charge', 'current(mA)'].values[1]))
             charge_capacity = float(cycleDF.loc[cycleDF['status'] == 'charge', 'charge_capacity(mAh)'].iloc[-1])
             discharge_capacity = float(cycleDF.loc[cycleDF['status'] == 'discharge', 'discharge_capacity(mAh)'].iloc[-1])
-            cycle_data = pd.DataFrame([{'cell_name': cell_number,
+            cycle_data = {'cell_name': cell_number,
                                         'cycle#': cycle,
                                         'current_mA': current,
                                         'discharge_capacity(mAh)': discharge_capacity,
-                                        'charge_capacity(mAh)': charge_capacity}])
-        cell_data = pd.concat([cycle_data, cell_data], ignore_index=True)
+                                        'charge_capacity(mAh)': charge_capacity}
+            dqdv_data = pd.DataFrame({
+                'step': cycleDF['step'], 'status': cycleDF['status'], 'current(mA)': cycleDF['current(mA)'],
+                'voltage(V)': cycleDF['voltage(V)'], 'DV': cycleDF['voltage(V)'].diff(10),
+                'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'], 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(10),
+                'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'], 'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(10)})
+            dqdv_data = dqdv_data[dqdv_data['DV'] != 0]
+        cell_data.append(cycle_data)
         name = filename.split('_')
+        if name[0][0] == 'P':
+            name[2] = str(cycle).zfill(4)
+        elif name[0][0] == 'C':
+            name[1] = str(cycle).zfill(4)
+        filename = '_'.join(name)
+        cycleDF.to_csv(csv_path + '/' + filename + '.csv')
+        plotCapV(filename, cycleDF, cell_number, cell_type, capVplot_path)
+        plotdqdv(filename, dqdv_data, dqdvplot_path)
     return cell_data
+
+def plotCapV(filename, df, cell_number, cell_type, output_path):
+    plot_name = os.path.splitext(os.path.split(filename)[1])[0] + "_CapV.png" #add CapV to filename and change extension to .png
+    charge = df.loc[df['status'].isin(['charge'])]
+    discharge = df.loc[df['status'].isin(['discharge'])]
+    plt.plot(discharge['discharge_capacity(mAh)'], discharge['voltage(V)'], label='Discharge', color='blue')
+    plt.plot(charge['charge_capacity(mAh)'], charge['voltage(V)'], label='Charge', color='red')
+    plt.title(plot_name)
+    plt.legend()
+    plt.xlabel('Capacity(mAh)')
+    plt.ylabel('Voltage(V)')
+    plt.savefig(output_path + '/' + plot_name)
+    plt.clf()
+
+def plotdqdv(filename, dqdv_data, output_path):
+    plot_name = os.path.splitext(os.path.split(filename)[1])[0] + '_dqdv.png'
+    dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
+    dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=100).mean()
+    dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
+    dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=100).mean()
+    charge = dqdv_data[dqdv_data['status'] == 'charge']
+    discharge = dqdv_data[dqdv_data['status'] == 'discharge']
+    plt.plot(charge['voltage(V)'], charge['smoothed_charge'], label='Charge', color='red')
+    plt.plot(discharge['voltage(V)'], discharge['smoothed_discharge'], label='Discharge', color='blue')
+    plt.title(plot_name)
+    plt.legend()
+    plt.xlabel('Voltage(V)')
+    plt.ylabel('DQ/DV')
+    plt.savefig(output_path + '/' + plot_name)
+    plt.clf()
 
 
 #setting up dataframes
-cycle_data =pd.DataFrame(index=[],
-                         columns=['cell_name', 'cycle#', 'current_mA',
-                                  'cell_discharge_capacity_mAh', 'cell_charge_capacity_mAh'])
+cycle_data = []
 updated_cells = []
 
 '''
@@ -122,10 +168,10 @@ for file in files:
     #identify filetype
     if extension == '.res':
         df = echem.parseArbin(file_path)
-        df = convertdf(df, cell_tester)
+        df = convertdf(df, extension, filename)
     elif extension == '.ndax':
         df = NewareNDA.read(file_path, cycle_mode='auto')
-        df = convertdf(df, cell_tester)
+        df = convertdf(df, extension, filename)
     elif extension == '.csv':
         df = pd.read_csv(file_path)
     elif extension == '.xlsx':
@@ -134,3 +180,6 @@ for file in files:
     cycle_data = splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
+cycle_data = pd.DataFrame(cycle_data)
+cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+
