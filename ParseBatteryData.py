@@ -16,13 +16,17 @@ capVplot_path = 'data/output/capVplots'
 dqdvplot_path = 'data/output/dqdvPlots'
 
 
+def converttimestamp(x):
+    return pd.to_datetime(x, unit='d', origin=pd.Timestamp('1900-1-1'))
+
+
 def convertdf(df, extension, filename):
     converted_df = pd.DataFrame(columns=['step_time', 'datetime', 'cycle', 'step',
                                          'status', 'current(mA)', 'voltage(V)',
                                          'charge_capacity(mAh)', 'discharge_capacity(mAh)'])
     if extension == '.res':
         converted_df['step_time'] = df['Step_Time']
-        converted_df['datetime'] = pd.to_datetime(df['DateTime'][0], unit='d', origin=pd.Timestamp('1899-12-30'))
+        converted_df['datetime'] = df['DateTime'].apply(converttimestamp)
         converted_df['step'] = df['Step_Index']
         converted_df['cycle'] = df['Cycle_Index']
         converted_df['current(mA)'] = df['Current'] * 1000
