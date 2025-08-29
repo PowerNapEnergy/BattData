@@ -58,6 +58,8 @@ def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
     for i in cyclelist:
         cycleDF = df.loc[df['cycle'].isin([i])]
         steps = cycleDF['step'].unique().tolist()
+        charge_steps = cycleDF.loc[cycleDF['status'] == 'charge', 'step'].unique().tolist()
+        discharge_steps = cycleDF.loc[cycleDF['status'] == 'discharge', 'step'].unique().tolist()
         try:
             x = len(steps)
             if x<4:
@@ -71,7 +73,12 @@ def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
             else:
                 cycle = cyclerange[i - 1]
             current = float(abs(cycleDF.loc[cycleDF['status'] == 'charge', 'current(mA)'].values[1]))
-            charge_capacity = float(cycleDF.loc[cycleDF['status'] == 'charge', 'charge_capacity(mAh)'].iloc[-1])
+            if len(charge_steps) == 1:
+                charge_capacity = float(cycleDF.loc[cycleDF['status'] == 'charge', 'charge_capacity(mAh)'].iloc[-1])
+            elif len(charge_steps) == 2:
+                cc_charge = float(cycleDF.loc[cycleDF['step'] == charge_steps[0], 'charge_capacity(mAh)'].iloc[-1])
+                cv_charge = float(cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'].iloc[-1])
+                charge_capacity = cc_charge + cv_charge
             discharge_capacity = float(cycleDF.loc[cycleDF['status'] == 'discharge', 'discharge_capacity(mAh)'].iloc[-1])
             cycle_data = {'cell_name': cell_number,
                                         'cycle#': cycle,
@@ -84,6 +91,10 @@ def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
                 'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'], 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(10),
                 'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'], 'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(10)})
             dqdv_data = dqdv_data[dqdv_data['DV'] != 0]
+            dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
+            dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=100).mean()
+            dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
+            dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=100).mean()
         cell_data.append(cycle_data)
         name = filename.split('_')
         if name[0][0] == 'P':
@@ -92,6 +103,7 @@ def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
             name[1] = str(cycle).zfill(4)
         filename = '_'.join(name)
         cycleDF.to_csv(csv_path + '/' + filename + '.csv')
+        dqdv_data.to_csv(csv_path + '/' + filename + '_dqdv.csv')
         plotCapV(filename, cycleDF, cell_number, cell_type, capVplot_path)
         plotdqdv(filename, dqdv_data, dqdvplot_path)
     return cell_data
@@ -111,10 +123,6 @@ def plotCapV(filename, df, cell_number, cell_type, output_path):
 
 def plotdqdv(filename, dqdv_data, output_path):
     plot_name = os.path.splitext(os.path.split(filename)[1])[0] + '_dqdv.png'
-    dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
-    dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=100).mean()
-    dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
-    dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=100).mean()
     charge = dqdv_data[dqdv_data['status'] == 'charge']
     discharge = dqdv_data[dqdv_data['status'] == 'discharge']
     plt.plot(charge['voltage(V)'], charge['smoothed_charge'], label='Charge', color='red')
@@ -180,6 +188,10 @@ for file in files:
         df = pd.read_csv(file_path)
     elif extension == '.xlsx':
         df = pd.read_excel(file_path)
+    elif filename == '.gitkeep':
+        continue
+    else:
+        print("unknown format" + filename)
 
     cycle_data = splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
