@@ -10,7 +10,6 @@ API_KEY = os.getenv('API_KEY')
 Base_id = os.getenv('Base_id')
 Cell_table = os.getenv('Cell_table')
 Cycle_table = os.getenv('Cycle_table')
-View_name = os.getenv('View_name')
 
 data_upload_columns = ['Cell_Name', 'Cycle#', 'Current_mA',
                        'Cell_Discharge_Cap_mAh', 'Cell_Charge_Cap_mAh']
@@ -50,10 +49,11 @@ def data_upload(New_Data_DF):
         Cell_Charge_Cap_mAh = row['charge_capacity(mAh)']
         data = {'Cell_Name': Cell_Name, 'Cycle#': Cycle, 'Current_mA': Current_mA, 'Cell_Discharge_Cap_mAh': Cell_Discharge_Cap_mAh, 'Cell_Charge_Cap_mAh': Cell_Charge_Cap_mAh}
         create_record(data)
+
 '''
 New_Data_DF = pd.read_csv(file_path)
 cells = New_Data_DF['cell_name'].unique().tolist()
-for cell in cells:
-    airtable_df = get_record({'cell_name': cell})
+#for cell in cells:
+#    airtable_df = get_record({'cell_name': cell})
 data_upload(New_Data_DF)
 '''

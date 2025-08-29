@@ -9,7 +9,7 @@ import electrochem as echem
 import NewareNDA
 
 #imports from this project
-from airtable import get_AAM_Wt
+import airtable
 
 #setting up file tree
 input_path = 'data/input'
@@ -184,19 +184,19 @@ for file in files:
 
     #identify filetype
     if extension == '.res':
-        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
+        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
         df = echem.parseArbin(file_path)
         df = convertdf(df, extension, filename)
     elif extension == '.ndax':
-        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
+        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
         df = NewareNDA.read(file_path, cycle_mode='auto')
         df = convertdf(df, extension, filename)
     elif extension == '.csv':
         df = pd.read_csv(file_path)
-        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
+        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
     elif extension == '.xlsx':
         df = pd.read_excel(file_path)
-        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
+        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
     elif filename == '.gitkeep':
         continue
     else:
@@ -208,4 +208,5 @@ for file in files:
     print(filename)
 cycle_data = pd.DataFrame(cycle_data)
 cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+#airtable.data_upload(cycle_data)
 
