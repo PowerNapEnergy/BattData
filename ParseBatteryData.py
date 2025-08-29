@@ -8,6 +8,9 @@ import matplotlib.pyplot as plt
 import electrochem as echem
 import NewareNDA
 
+#imports from this project
+from airtable import get_AAM_Wt
+
 #setting up file tree
 input_path = 'data/input'
 output_path = 'data/output'
@@ -51,7 +54,7 @@ def convertdf(df, extension, filename):
     return converted_df
 
 
-def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
+def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycle, end_cycle,
                    cell_data, output_path, csv_path, capVplot_path, dqdvplot_path):
     cyclelist = df['cycle'].unique().tolist()
     cyclerange = list(range(start_cycle, end_cycle+2))
@@ -104,19 +107,21 @@ def splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
         filename = '_'.join(name)
         cycleDF.to_csv(csv_path + '/' + filename + '.csv')
         dqdv_data.to_csv(csv_path + '/' + filename + '_dqdv.csv')
-        plotCapV(filename, cycleDF, cell_number, cell_type, capVplot_path)
+        plotCapV(filename, cycleDF, cell_number, cell_aam_wt, cell_type, capVplot_path)
         plotdqdv(filename, dqdv_data, dqdvplot_path)
     return cell_data
 
-def plotCapV(filename, df, cell_number, cell_type, output_path):
+def plotCapV(filename, df, cell_number, cell_aam_wt, cell_type, output_path):
     plot_name = os.path.splitext(os.path.split(filename)[1])[0] + "_CapV.png" #add CapV to filename and change extension to .png
     charge = df.loc[df['status'].isin(['charge'])]
+    specific_charge = charge['charge_capacity(mAh)']/cell_aam_wt
     discharge = df.loc[df['status'].isin(['discharge'])]
-    plt.plot(discharge['discharge_capacity(mAh)'], discharge['voltage(V)'], label='Discharge', color='blue')
-    plt.plot(charge['charge_capacity(mAh)'], charge['voltage(V)'], label='Charge', color='red')
+    specific_discharge = discharge['discharge_capacity(mAh)'] / cell_aam_wt
+    plt.plot(specific_discharge, discharge['voltage(V)'], label='Discharge', color='blue')
+    plt.plot(specific_charge, charge['voltage(V)'], label='Charge', color='red')
     plt.title(plot_name)
     plt.legend()
-    plt.xlabel('Capacity(mAh)')
+    plt.xlabel('Specific Capacity(mAh/g)')
     plt.ylabel('Voltage(V)')
     plt.savefig(output_path + '/' + plot_name)
     plt.clf()
@@ -179,21 +184,26 @@ for file in files:
 
     #identify filetype
     if extension == '.res':
+        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
         df = echem.parseArbin(file_path)
         df = convertdf(df, extension, filename)
     elif extension == '.ndax':
+        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
         df = NewareNDA.read(file_path, cycle_mode='auto')
         df = convertdf(df, extension, filename)
     elif extension == '.csv':
         df = pd.read_csv(file_path)
+        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
     elif extension == '.xlsx':
         df = pd.read_excel(file_path)
+        cell_aam_wt = get_AAM_Wt({'Name': cell_number})
     elif filename == '.gitkeep':
         continue
     else:
         print("unknown format" + filename)
 
-    cycle_data = splitcycledata(filename, df, cell_type, cell_number, start_cycle, end_cycle,
+
+    cycle_data = splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycle, end_cycle,
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
 cycle_data = pd.DataFrame(cycle_data)
