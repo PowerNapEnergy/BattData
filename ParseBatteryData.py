@@ -112,19 +112,29 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
     return cell_data
 
 def plotCapV(filename, df, cell_number, cell_aam_wt, cell_type, output_path):
-    plot_name = os.path.splitext(os.path.split(filename)[1])[0] + "_CapV.png" #add CapV to filename and change extension to .png
+    cellCap_plot = os.path.splitext(os.path.split(filename)[1])[0] + "_CellCapV.png" #add CapV to filename and change extension to .png
+    specificCap_plot = os.path.splitext(os.path.split(filename)[1])[0] + "_SpecificCapV.png"
     charge = df.loc[df['status'].isin(['charge'])]
     specific_charge = charge['charge_capacity(mAh)']/cell_aam_wt
     discharge = df.loc[df['status'].isin(['discharge'])]
     specific_discharge = discharge['discharge_capacity(mAh)'] / cell_aam_wt
+    plt.plot(discharge['discharge_capacity(mAh)'], discharge['voltage(V)'], label='Discharge', color='blue')
+    plt.plot(charge['charge_capacity(mAh)'], charge['voltage(V)'], label='Charge', color='red')
+    plt.title(os.path.splitext(os.path.split(filename)[1])[0])
+    plt.legend()
+    plt.xlabel('Cell Capacity(mAh)')
+    plt.ylabel('Voltage(V)')
+    plt.savefig(output_path + '/' + cellCap_plot)
+    plt.clf()
     plt.plot(specific_discharge, discharge['voltage(V)'], label='Discharge', color='blue')
     plt.plot(specific_charge, charge['voltage(V)'], label='Charge', color='red')
-    plt.title(plot_name)
+    plt.title(os.path.splitext(os.path.split(filename)[1])[0])
     plt.legend()
     plt.xlabel('Specific Capacity(mAh/g)')
     plt.ylabel('Voltage(V)')
-    plt.savefig(output_path + '/' + plot_name)
+    plt.savefig(output_path + '/' + specificCap_plot)
     plt.clf()
+
 
 def plotdqdv(filename, dqdv_data, output_path):
     plot_name = os.path.splitext(os.path.split(filename)[1])[0] + '_dqdv.png'
