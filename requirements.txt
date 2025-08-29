@@ -3,7 +3,8 @@ pandas
 matplotlib
 electrochem
 requests>=2.32.5
-setuptools==80.9.0
+packaging
+#setuptools==80.9.0
 NewareNDA
 pyairtable
 dotenv
