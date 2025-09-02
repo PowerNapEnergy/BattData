@@ -61,27 +61,56 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
     for i in cyclelist:
         cycleDF = df.loc[df['cycle'].isin([i])]
         steps = cycleDF['step'].unique().tolist()
+        if cyclelist[0] == cyclerange[0]:
+            cycle = i
+        else:
+            cycle = cyclerange[i - 1]
+        step_types = cycleDF['status'].tolist()
         charge_steps = cycleDF.loc[cycleDF['status'] == 'charge', 'step'].unique().tolist()
         discharge_steps = cycleDF.loc[cycleDF['status'] == 'discharge', 'step'].unique().tolist()
+        step_sequence = []
+        prev = object()
+        for item in step_types:
+            if item != prev:
+                step_sequence.append(item)
+            prev = item
         try:
-            x = len(steps)
-            if x<4:
-                raise ValueError("Incomplete Cycle")
+#            if x<4:
+#                raise ValueError("Incomplete Cycle")
+            index = step_sequence.index('charge')
         except ValueError:
-            print('Incomplete Cycle:' + filename)
+            print('Incomplete Cycle:' + cell_number + '_' + 'Cycle' + str(cycle))
             continue
         else:
-            if cyclelist[0] == cyclerange[0]:
-                cycle = i
+            pass
+        try:
+            index = step_sequence.index('discharge')
+        except ValueError:
+            print('Incomplete Cycle:' + cell_number + '_' + 'Cycle' + str(cycle))
+            continue
+        else:
+            pass
+        try:
+            final_step = step_sequence[-1]
+            if final_step != 'rest':
+                print('Incomplete Cycle:' + cell_number + '_' + 'Cycle' + str(cycle))
+                continue
             else:
-                cycle = cyclerange[i - 1]
+                pass
+        finally:
             current = float(abs(cycleDF.loc[cycleDF['status'] == 'charge', 'current(mA)'].values[1]))
             if len(charge_steps) == 1:
                 charge_capacity = float(cycleDF.loc[cycleDF['status'] == 'charge', 'charge_capacity(mAh)'].iloc[-1])
             elif len(charge_steps) == 2:
                 cc_charge = float(cycleDF.loc[cycleDF['step'] == charge_steps[0], 'charge_capacity(mAh)'].iloc[-1])
                 cv_charge = float(cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'].iloc[-1])
-                charge_capacity = cc_charge + cv_charge
+                if cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'].iloc[0] == 0:
+                    cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'] \
+                        += float(cycleDF.loc[cycleDF['step'] == charge_steps[0], 'charge_capacity(mAh)'].iloc[-1])
+                    charge_capacity = float(cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'].iloc[-1])
+                else:
+                    charge_capacity = float(
+                        cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'].iloc[-1])
             discharge_capacity = float(cycleDF.loc[cycleDF['status'] == 'discharge', 'discharge_capacity(mAh)'].iloc[-1])
             cycle_data = {'cell_name': cell_number,
                                         'cycle#': cycle,
@@ -93,7 +122,7 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
                 'voltage(V)': cycleDF['voltage(V)'], 'DV': cycleDF['voltage(V)'].diff(10),
                 'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'], 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(10),
                 'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'], 'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(10)})
-            dqdv_data = dqdv_data[dqdv_data['DV'] != 0]
+            dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
             dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
             dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=100).mean()
             dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
@@ -218,5 +247,5 @@ for file in files:
     print(filename)
 cycle_data = pd.DataFrame(cycle_data)
 cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-#airtable.data_upload(cycle_data)
+airtable.data_upload(cycle_data)
 

@@ -47,8 +47,15 @@ def data_upload(New_Data_DF):
         Current_mA = row['current_mA']
         Cell_Discharge_Cap_mAh = row['discharge_capacity(mAh)']
         Cell_Charge_Cap_mAh = row['charge_capacity(mAh)']
-        data = {'Cell_Name': Cell_Name, 'Cycle#': Cycle, 'Current_mA': Current_mA, 'Cell_Discharge_Cap_mAh': Cell_Discharge_Cap_mAh, 'Cell_Charge_Cap_mAh': Cell_Charge_Cap_mAh}
-        create_record(data)
+        data = {'Cell_Name': Cell_Name, 'Cycle#': Cycle, 'Current_mA': Current_mA,
+                'Cell_Discharge_Cap_mAh': Cell_Discharge_Cap_mAh, 'Cell_Charge_Cap_mAh': Cell_Charge_Cap_mAh}
+        cycle_table = Table(API_KEY, Base_id, Cycle_table)
+        formula = f"AND({{Cell_Name}} = '{Cell_Name}', {{Cycle#}} = '{Cycle}')"
+        records = cycle_table.all(formula=formula)
+        if records:
+            print("Entry already exists:", records[0]['fields']['Name'])
+        else:
+            create_record(data)
 
 '''
 New_Data_DF = pd.read_csv(file_path)
