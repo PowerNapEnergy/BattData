@@ -268,7 +268,7 @@ for file in files:
     cycle_data = splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycle, end_cycle,
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
-#cycle_data = pd.DataFrame(cycle_data)
-#cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-#airtable.data_upload(cycle_data)
+cycle_data = pd.DataFrame(cycle_data)
+cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+airtable.data_upload(cycle_data)
 
