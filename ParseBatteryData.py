@@ -3,6 +3,8 @@ import os
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
+from dotenv import load_dotenv
+import math
 
 #imports from other github users
 import electrochem as echem
@@ -11,7 +13,14 @@ import NewareNDA
 #imports from this project
 import airtable
 
+#load .env Data
+load_dotenv()
+dqdv_step = int(os.getenv('dqdv_diff'))
+dqdv_smooth = int(os.getenv('dqdv_smooth'))
+
+
 #setting up file tree
+
 input_path = 'data/input'
 output_path = 'data/output'
 csv_path = 'data/output/csv'
@@ -75,8 +84,6 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
                 step_sequence.append(item)
             prev = item
         try:
-#            if x<4:
-#                raise ValueError("Incomplete Cycle")
             index = step_sequence.index('charge')
         except ValueError:
             print('Incomplete Cycle:' + cell_number + '_' + 'Cycle' + str(cycle))
@@ -119,14 +126,14 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
                                         'charge_capacity(mAh)': charge_capacity}
             dqdv_data = pd.DataFrame({
                 'step': cycleDF['step'], 'status': cycleDF['status'], 'current(mA)': cycleDF['current(mA)'],
-                'voltage(V)': cycleDF['voltage(V)'], 'DV': cycleDF['voltage(V)'].diff(10),
-                'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'], 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(10),
+                'voltage(V)': cycleDF['voltage(V)'], 'DV': cycleDF['voltage(V)'].diff(dqdv_step),
+                'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'], 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(dqdv_step),
                 'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'], 'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(10)})
             dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
             dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
-            dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=100).mean()
+            dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
             dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
-            dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=100).mean()
+            dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=dqdv_smooth).mean()
         cell_data.append(cycle_data)
         name = filename.split('_')
         if name[0][0] == 'P':
@@ -137,7 +144,7 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
         cycleDF.to_csv(csv_path + '/' + filename + '.csv')
         dqdv_data.to_csv(csv_path + '/' + filename + '_dqdv.csv')
         plotCapV(filename, cycleDF, cell_number, cell_aam_wt, cell_type, capVplot_path)
-        plotdqdv(filename, dqdv_data, dqdvplot_path)
+        plotdqdv(filename, dqdv_data, dqdvplot_path, cell_number, cycle)
     return cell_data
 
 def plotCapV(filename, df, cell_number, cell_aam_wt, cell_type, output_path):
@@ -165,14 +172,30 @@ def plotCapV(filename, df, cell_number, cell_aam_wt, cell_type, output_path):
     plt.clf()
 
 
-def plotdqdv(filename, dqdv_data, output_path):
+def plotdqdv(filename, dqdv_data, output_path, cell_number, cycle):
     plot_name = os.path.splitext(os.path.split(filename)[1])[0] + '_dqdv.png'
     charge = dqdv_data[dqdv_data['status'] == 'charge']
     discharge = dqdv_data[dqdv_data['status'] == 'discharge']
+    charge_max = str(charge['smoothed_charge'].max())
+    discharge_min = str(discharge['smoothed_discharge'].min())
+    if charge_max == 'nan':
+        if discharge_min == 'nan':
+            print('No Data:' + cell_number + '_' + 'Cycle' + str(cycle))
+        else:
+            charge_peak = discharge_peak = abs(math.floor((discharge['smoothed_discharge'].min())*10)/10)
+    elif discharge_min == 'nan':
+        charge_peak = discharge_peak = abs(math.ceil((charge['smoothed_charge'].max())*10)/10)
+    else:
+        charge_peak = abs(math.ceil((charge['smoothed_charge'].max())*10)/10)
+        discharge_peak = abs(math.floor((discharge['smoothed_discharge'].min())*10)/10)
     plt.plot(charge['voltage(V)'], charge['smoothed_charge'], label='Charge', color='red')
     plt.plot(discharge['voltage(V)'], discharge['smoothed_discharge'], label='Discharge', color='blue')
     plt.title(plot_name)
     plt.legend()
+    if charge_peak >= discharge_peak:
+        plt.ylim(-charge_peak, charge_peak)
+    elif charge_peak < discharge_peak:
+        plt.ylim(-discharge_peak, discharge_peak)
     plt.xlabel('Voltage(V)')
     plt.ylabel('DQ/DV')
     plt.savefig(output_path + '/' + plot_name)
@@ -245,7 +268,7 @@ for file in files:
     cycle_data = splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycle, end_cycle,
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
-cycle_data = pd.DataFrame(cycle_data)
-cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-airtable.data_upload(cycle_data)
+#cycle_data = pd.DataFrame(cycle_data)
+#cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+#airtable.data_upload(cycle_data)
 
