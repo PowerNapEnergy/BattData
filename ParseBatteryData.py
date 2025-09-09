@@ -17,15 +17,40 @@ import airtable
 load_dotenv()
 dqdv_step = int(os.getenv('dqdv_diff'))
 dqdv_smooth = int(os.getenv('dqdv_smooth'))
-
+Directory = os.getenv('Directory')
 
 #setting up file tree
-
-input_path = 'data/input'
-output_path = 'data/output'
-csv_path = 'data/output/csv'
-capVplot_path = 'data/output/capVplots'
-dqdvplot_path = 'data/output/dqdvPlots'
+if os.path.exists(Directory + 'input/'):
+    input_path = Directory + 'input/'
+else:
+    os.mkdir(Directory + 'input/')
+    input_path = Directory + 'input/'
+if os.path.exists(Directory + 'output/'):
+    output_path = Directory + 'output/'
+else:
+    os.mkdir(Directory + 'output')
+    output_path = Directory + 'output/'
+if os.path.exists(Directory + 'output/csv/'):
+    csv_path = Directory + 'output/csv/'
+elif os.path.exists(Directory + 'csv/'):
+    csv_path = Directory + 'csv/'
+else:
+    os.mkdir(Directory + 'csv/')
+    csv_path = Directory + 'csv/'
+if os.path.exists(Directory + 'output/capVplots/'):
+    capVplot_path = Directory + 'output/capVplots/'
+elif os.path.exists(Directory + 'capVplots/'):
+    capVplot_path = Directory + 'capVplots/'
+else:
+    os.mkdir(Directory + 'capVplots/')
+    capVplot_path = Directory + 'capVplots/'
+if os.path.exists(Directory + 'output/dqdvPlots/'):
+    dqdvplot_path = Directory + 'output/dqdvPlots/'
+elif os.path.exists(Directory + 'dqdvPlots/'):
+    dqdvplot_path = Directory + 'dqdvPlots/'
+else:
+    os.mkdir(Directory + 'dqdvPlots/')
+    dqdvplot_path = Directory + 'dqdvPlots/'
 
 
 def converttimestamp(x):
@@ -141,7 +166,7 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
         elif name[0][0] == 'C':
             name[1] = str(cycle).zfill(4)
         filename = '_'.join(name)
-        cycleDF.to_csv(csv_path + '/' + filename + '.csv')
+        cycleDF.to_csv(csv_path + '/' + filename + '_cycle.csv')
         dqdv_data.to_csv(csv_path + '/' + filename + '_dqdv.csv')
         plotCapV(filename, cycleDF, cell_number, cell_aam_wt, cell_type, capVplot_path)
         plotdqdv(filename, dqdv_data, dqdvplot_path, cell_number, cycle)
@@ -268,7 +293,7 @@ for file in files:
     cycle_data = splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycle, end_cycle,
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
-cycle_data = pd.DataFrame(cycle_data)
-cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-airtable.data_upload(cycle_data)
+#cycle_data = pd.DataFrame(cycle_data)
+#cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+#airtable.data_upload(cycle_data)
 
