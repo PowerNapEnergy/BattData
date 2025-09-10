@@ -12,7 +12,9 @@ Cell_table = os.getenv('Cell_table')
 Cycle_table = os.getenv('Cycle_table')
 
 data_upload_columns = ['Cell_Name', 'Cycle#', 'Current_mA',
-                       'Cell_Discharge_Cap_mAh', 'Cell_Charge_Cap_mAh']
+                       'Cell_Discharge_Cap_mAh', 'Cell_Charge_Cap_mAh',
+                       'AAM_Charge_Cap_mAh/g', 'AAM_Discharge_Cap_mAh/g',
+                       'Coulombic_Efficiency', 'Retention_AF']
 file_path = 'data/output/New_Cycle_Data.csv'
 
 def get_record(filter: dict) -> dict:
