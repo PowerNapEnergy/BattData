@@ -57,6 +57,14 @@ def data_upload(New_Data_DF):
         else:
             create_record(data)
 
+def get_cell_list():
+    api = Api(API_KEY)
+    table = api.table(Base_id, Cell_table)
+    records = table.all(sort=['Name'], fields=['Name'])
+    cell_df = pd.DataFrame(record['fields'] for record in records)
+    cell_list = cell_df['Name'].tolist()
+    return cell_list
+
 '''
 New_Data_DF = pd.read_csv(file_path)
 cells = New_Data_DF['cell_name'].unique().tolist()
