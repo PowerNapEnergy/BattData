@@ -91,7 +91,7 @@ def update_eis(cells_chosen):
                 x = df["Z' (Ω)"]
                 y = df['-Z'' (Ω)']
             fig.add_traces(go.Scatter(x=x, y=y, mode='lines+markers', name=plotname))
-    fig.update_layout(title={'text': 'Nyquist Plot', 'xanchor': 'center', 'x':0.5}, autotypenumbers='convert types', height=600,
+    fig.update_layout(title={'text': 'Nyquist Plot', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types', height=600,
                       legend=dict(orientation='h', yanchor='top', xanchor='left', y=-.1))
     fig.update_xaxes(title="Z'")
     fig.update_yaxes(scaleanchor='x', scaleratio=1.5, title='-Z"')

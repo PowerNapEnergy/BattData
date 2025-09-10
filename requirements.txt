@@ -8,3 +8,4 @@ NewareNDA
 pyairtable
 dotenv
 dash
+openpyxl
