@@ -75,13 +75,21 @@ def get_cell_list(meta_data_columns):
     return cell_dict, cell_list
 
 def get_cell_record(filter:dict) -> dict:
-    formula=match(filter)
+    formula = match(filter)
     api = Api(API_KEY)
     table = api.table(Base_id, Cell_table)
     records = table.all(fields=meta_data_columns, cell_format='string', user_locale='en-nz',
                         time_zone='America/Los_Angeles',
                         formula=formula)
     result = pd.DataFrame(record["fields"] for record in records)
+    return result
+
+def get_filter_choices(filter_options):
+    #api = Api(API_KEY)
+    #table = api.table(Base_id, Cell_table)
+    #records = table.all(fields=filter_options, cell_format='string')
+    #result = pd.DataFrame(record["fields"] for record in records)
+    result = ['A', 'B', 'C']
     return result
 
 '''
