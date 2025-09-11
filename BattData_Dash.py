@@ -12,8 +12,8 @@ from dotenv import load_dotenv
 load_dotenv()
 Repository = os.getenv('Repository')
 meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte', 'Cyc20vsAF_Retention']
-cells = airtable.get_cell_list()
-cycle_list = []
+cell_dict, cells = airtable.get_cell_list(meta_data_columns)
+#records = pd.DataFrame(columns=meta_data_columns)
 #cycle_life = airtable.get_record({'Cell_Name': 'C432'})
 
 #Initialize the App
@@ -23,19 +23,20 @@ app = Dash()
 app.layout = html.Div([
 
             html.Div(children=['Cell Tracking']),
-
             html.Hr(),
-
             dcc.Dropdown(id='multi_select_dropdown', options=cells, multi=True, value=[]),
-            dcc.RadioItems(id='cycle_life_view', options=['Cell Capacity', 'Specific Capacity', 'Retention', 'Efficiency'],
-                            value='Cell Capacity', inline=True),
+            dash_table.DataTable(id='meta_data', data=cell_dict, page_size=10),
+            dcc.RadioItems(
+                id='cycle_life_view',
+                options=['Cell Capacity', 'Specific Capacity', 'Retention', 'Efficiency'],
+                value='Cell Capacity', inline=True),
             html.Div([
             html.Div([dcc.Graph(figure={'layout': {'title': 'Cycle Life'}}, id='cycle_life')],
                      style={'width': '45vw', 'display': 'inline-block'}),
 
             html.Div([dcc.Graph(figure={'layout': {'title': 'Nyquist Plot'}}, id='eis')],
                      style={'width': '45vw', 'display': 'inline-block'})
-])
+            ]),
 ])
 
 # App Controls
@@ -96,6 +97,18 @@ def update_eis(cells_chosen):
     fig.update_xaxes(title="Z'")
     fig.update_yaxes(scaleanchor='x', scaleratio=1.5, title='-Z"')
     return fig
+
+
+@callback(Output(component_id='meta_data', component_property='data'),
+          Input(component_id='multi_select_dropdown', component_property='value')
+          )
+def update_table(cells_chosen):
+    records = pd.DataFrame(columns=meta_data_columns)
+    for cell in cells_chosen:
+        record = airtable.get_cell_record({'Name': cell})
+        records = pd.concat([records, record], ignore_index=True)
+    cell_dict = records.to_dict('records')
+    return cell_dict
 
 @callback(
     Output(component_id='cycle_life', component_property='figure'),
@@ -171,7 +184,7 @@ if __name__ == '__main__':
 
 
 
-#dash_table.DataTable(id='meta_data', data=df_dict, page_size=10),
+#,
 #dcc.Graph(figure={}, id='single_cycle'),
 #dcc.Dropdown(id='cycles', options=cycle_list, multi=True, value=[]),
 
