@@ -12,7 +12,14 @@ Cell_table = os.getenv('Cell_table')
 Cycle_table = os.getenv('Cycle_table')
 
 data_upload_columns = ['Cell_Name', 'Cycle#', 'Current_mA',
-                       'Cell_Discharge_Cap_mAh', 'Cell_Charge_Cap_mAh']
+                       'Cell_Discharge_Cap_mAh', 'Cell_Charge_Cap_mAh',
+                       'AAM_Charge_Cap_mAh/g', 'AAM_Discharge_Cap_mAh/g',
+                       'Coulombic_Efficiency', 'Retention_AF']
+
+meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material',
+                     'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte',
+                     'Cyc20vsAF_Retention']
+
 file_path = 'data/output/New_Cycle_Data.csv'
 
 def get_record(filter: dict) -> dict:
@@ -56,6 +63,26 @@ def data_upload(New_Data_DF):
             print("Entry already exists:", records[0]['fields']['Name'])
         else:
             create_record(data)
+
+def get_cell_list(meta_data_columns):
+    api = Api(API_KEY)
+    table = api.table(Base_id, Cell_table)
+    records = table.all(sort=['Name'], cell_format='string', user_locale='en-nz',
+                        time_zone='America/Los_Angeles', fields=meta_data_columns)
+    cell_df = pd.DataFrame(record['fields'] for record in records)
+    cell_dict = cell_df.to_dict('records')
+    cell_list = cell_df['Name'].tolist()
+    return cell_dict, cell_list
+
+def get_cell_record(filter:dict) -> dict:
+    formula=match(filter)
+    api = Api(API_KEY)
+    table = api.table(Base_id, Cell_table)
+    records = table.all(fields=meta_data_columns, cell_format='string', user_locale='en-nz',
+                        time_zone='America/Los_Angeles',
+                        formula=formula)
+    result = pd.DataFrame(record["fields"] for record in records)
+    return result
 
 '''
 New_Data_DF = pd.read_csv(file_path)
