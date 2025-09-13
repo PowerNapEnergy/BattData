@@ -15,6 +15,8 @@ meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Ca
 cell_dict, cells = airtable.get_cell_list(meta_data_columns)
 #records = pd.DataFrame(columns=meta_data_columns)
 #cycle_life = airtable.get_record({'Cell_Name': 'C432'})
+plot_colors = ['HotPink', 'red', 'blue', 'yellow', 'black', 'white', 'gold', 'indigo', 'lightblue', 'pink', 'khaki',
+               'brown', 'grey', 'forestgreen', 'midnightblue']
 
 #Initialize the App
 app = Dash()
@@ -47,7 +49,8 @@ app.layout = html.Div([
 def update_eis(cells_chosen):
     fig = go.Figure()
     for cell in cells_chosen:
-        file_path = Repository + 'eis/' + cell
+        #file_path = Repository + 'eis/' + cell
+        file_path = Repository + cell
         data_to_plot = os.listdir(file_path)
         for data in data_to_plot:
             data_path = os.path.join(file_path, data)
@@ -117,31 +120,37 @@ def update_table(cells_chosen):
 )
 def update_cyclelife(cells_chosen, cycle_life_view):
     fig = go.Figure()
+    color = 0
     for cell in cells_chosen:
+        color += 1
         cycle_life = airtable.get_record({'Cell_Name': cell})
         if cycle_life_view == 'Cell Capacity':
             fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['Cell_Discharge_Cap_mAh'],
                                       mode='markers',
-                                      name=cell))
+                                      name=cell,
+                                      marker=dict(color=plot_colors[color])))
             fig.update_yaxes(title='Cell Capacity(mAh)')
         elif cycle_life_view == 'Specific Capacity':
             fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['AAM_Discharge_Cap_mAh/g'],
                                       mode='markers',
-                                      name=cell))
+                                      name=cell,
+                                      marker=dict(color=plot_colors[color])))
             fig.update_yaxes(title='Specific Capacity (mAh/g)')
         elif cycle_life_view == 'Retention':
             fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['Retention_AF'],
                                       mode='markers',
-                                      name=cell))
+                                      name=cell,
+                                      marker=dict(color=plot_colors[color])))
             fig.update_yaxes(title='Capacity Retention(%)')
         elif cycle_life_view == 'Efficiency':
             fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['Coulombic_Efficiency'],
                                       mode='markers',
-                                      name=cell))
+                                      name=cell,
+                                      marker=dict(color=plot_colors[color])))
             fig.update_yaxes(title='Coulombic Efficiency(%)')
     fig.update_layout(title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types', height=600,
                       legend=dict(orientation='h', yanchor='top', y=-.1))
