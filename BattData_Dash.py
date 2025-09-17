@@ -12,9 +12,10 @@ from dotenv import load_dotenv
 load_dotenv()
 Repository = os.getenv('Repository')
 meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte', 'Cyc20vsAF_Retention']
-cell_dict, cells = airtable.get_cell_list(meta_data_columns)
+cell_dict, cells, cast_names, AAM_names, electrolyte_names = airtable.get_cell_list(meta_data_columns)
 filter_options = ['Cell_Type', 'Cast', 'AAM', 'Electrolyte']
 filter_choices = airtable.get_filter_choices(filter_options)
+cycles = ['1', '2', '3']
 #records = pd.DataFrame(columns=meta_data_columns)
 #cycle_life = airtable.get_record({'Cell_Name': 'C432'})
 
@@ -24,49 +25,81 @@ app = Dash()
 #App layout
 app.layout = html.Div(
             [
-            html.Div(
-                [
-                    html.Div([dash_table.DataTable(id='meta_data', data=cell_dict,
-                                                   columns=[{'name': i, 'id': i} for i in meta_data_columns],
-                                                   page_size=10)]),
-                    html.Div(
-                        [
+                html.Div(
+                    [
+                        html.Div([dash_table.DataTable(id='meta_data', data=cell_dict,
+                                                       columns=[{'name': i, 'id': i} for i in meta_data_columns],
+                                                       page_size=10)]),
                         html.Div(
                             [
-                            html.P("Cell Selector"),
-                            html.P("Filters"),
-                            dcc.Dropdown(id='filter_options', options=filter_options, multi=True, value=[]),
-                            html.P("Filtered Options"),
-                            dcc.Dropdown(id='filter_choices', options=filter_choices, multi=True, value=[]),
-                            html.P("Cell Selection"),
-                            dcc.Dropdown(id='cell_selector', options=cells, multi=True, value=[])
-                            ],
-                            style={"border": "2px solid black", 'flex-basis': '40%'}),
+                                html.Div(
+                                    [
+                                        html.P("Cell Selector"),
+                                        html.P("Filtering Options"),
+                                        html.Div(
+                                            [
+                                                html.Div(
+                                                    [
+                                                        html.P("Cell Type"),
+                                                        dcc.Dropdown(id='cell_type',
+                                                                     options=['Full Cell',
+                                                                              'Cathode Half Cell',
+                                                                              'Anode Half Cell'],
+                                                                     value=['Full Cell'])
+                                                    ], style={}),
+                                                html.Div(
+                                                    [
+                                                        html.P('Cast'),
+                                                        dcc.Dropdown(id='cast_name',
+                                                                     options=cast_names,
+                                                                        value=[])
+                                                    ], style={}),
+                                                html.Div(
+                                                    [
+                                                        html.P('Anode Active Material'),
+                                                        dcc.Dropdown(id='AAM',
+                                                                        options=AAM_names,
+                                                                        value=[])
+                                                    ], style={}),
+                                                html.Div(
+                                                    [
+                                                        html.P('Electrolyte'),
+                                                        dcc.Dropdown(id='Electrolyte', options=electrolyte_names, value=[])
+                                                    ], style={'flex-basis': '10%'}),
+                                            ], style={'display': 'flex', 'flexDirection': 'column'}),
+                                        html.P("Cell Selection"),
+                                        dcc.Dropdown(id='cell_selector', options=cells, multi=True, value=[])
+                                    ], style={'flex-basis': '50%', 'border': '2px solid yellow'}),
+                                html.Div(
+                                    [
+                                        dcc.RadioItems(id='cycle_life_view',
+                                                       options=['Cell Capacity', 'Specific Capacity', 'Retention', 'Efficiency'],
+                                                        value='Cell Capacity', inline=True),
+                                        dcc.Graph(figure={'layout': {'title': 'Cycle Life'}}, id='cycle_life')
+                                    ], style={'flex-basis': '50%', 'border': '2px solid black'}),
+                            ], style={'display': 'flex', 'flexDirection': 'row',
+                                      'border': '2px dashed black', 'maxHeight': '600px'}),
                         html.Div(
                             [
-                            html.Div(
-                                [dcc.RadioItems(
-                                    id='cycle_life_view',
-                                    options=['Cell Capacity', 'Specific Capacity', 'Retention', 'Efficiency'],
-                                    value='Cell Capacity', inline=True)
-                                    ],
-                                style={'border': '4px dashed blue'}
-                            ),
-                            html.Div(
-                                [dcc.Graph(figure={'layout': {'title': 'Cycle Life'}}, id='cycle_life')
-                                 ],
-                                style={"border": "2px solid green"}
-                            )
-                        ], style={"border": "4px dashed green", 'flex-basis': '60%'})
-                            ], style={'border': '4px dashed black', 'display': 'flex', 'flexDirection': 'row'}
-                    ),
-                    html.Div([
-                        html.Div([dcc.Graph(figure={'layout': {'title': 'Nyquist Plot'}}, id='eis')],
-                                 style={'flex-basis': '50%'}),
-                        html.Div([dcc.Graph(figure={'layout': {'title': 'Cycle Data'}}, id='cycle_data')],
-                                 style={'flex-basis': '50%'})],
-                        style={'display': 'flex', 'flexDirection': 'row', "border": "2px solid yellow"}),
-                    ], style={'display': 'block', "border": "4px dashed red"})
+                                html.Div(
+                                    [dcc.Graph(figure={'layout': {'title': 'Nyquist Plot'}}, id='eis')
+                                     ], style={'flex-basis': '50%', 'height': '100%'}),
+                                html.Div(
+                                    [
+                                        dcc.Dropdown(id='cycle_selection', options=cycles,
+                                                     multi=True, value=[], placeholder='Select Cycles'),
+                                        dcc.Graph(figure={'layout': {'title': 'Cycle Data'}}, id='cycle_data'),
+                                        dcc.RadioItems(id='cell_view',
+                                                       options=['Cell Capacity vs Voltage',
+                                                                'Specific Capacity vs Voltage',
+                                                                'Time vs Voltage',
+                                                                'dQ/dV'],
+                                                       value='Cell Capacity vs Voltage',
+                                                       inline=True)
+                                    ], style={'flex-basis': '50%'})
+                            ], style={'display': 'flex', 'flexDirection': 'row',
+                                      'border': '4px dashed green', 'maxHeight': '600px'}),
+                    ], style={})
                 ])
 
 # App Controls
@@ -202,7 +235,7 @@ def update_cyclelife(cells_chosen, cycle_life_view):
                                       mode='markers',
                                       name=cell))
             fig.update_yaxes(title='Coulombic Efficiency(%)')
-    fig.update_layout(title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types', height=600,
+    fig.update_layout(title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types',
                       legend=dict(orientation='h', yanchor='top', y=-.1))
     fig.update_xaxes(title='Cycle#')
     return fig

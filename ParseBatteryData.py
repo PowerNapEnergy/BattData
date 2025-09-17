@@ -152,8 +152,10 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
             dqdv_data = pd.DataFrame({
                 'step': cycleDF['step'], 'status': cycleDF['status'], 'current(mA)': cycleDF['current(mA)'],
                 'voltage(V)': cycleDF['voltage(V)'], 'DV': cycleDF['voltage(V)'].diff(dqdv_step),
-                'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'], 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(dqdv_step),
-                'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'], 'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(10)})
+                'charge_capacity(mAh)': cycleDF['charge_capacity(mAh)'],
+                'dq_charge': cycleDF['charge_capacity(mAh)'].diff(dqdv_step),
+                'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'],
+                'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(dqdv_step)})
             dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
             dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
             dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
@@ -294,6 +296,6 @@ for file in files:
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
 cycle_data = pd.DataFrame(cycle_data)
-cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-airtable.data_upload(cycle_data)
+#cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+#airtable.data_upload(cycle_data)
 

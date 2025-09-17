@@ -72,7 +72,10 @@ def get_cell_list(meta_data_columns):
     cell_df = pd.DataFrame(record['fields'] for record in records)
     cell_dict = cell_df.to_dict('records')
     cell_list = cell_df['Name'].tolist()
-    return cell_dict, cell_list
+    cast_list = cell_df['Cast'].dropna().unique().tolist()
+    AAM_list = cell_df['AAM'].dropna().unique().tolist()
+    electrolyte_list = cell_df['Electrolyte'].dropna().unique().tolist()
+    return cell_dict, cell_list, cast_list, AAM_list, electrolyte_list
 
 def get_cell_record(filter:dict) -> dict:
     formula = match(filter)
