@@ -22,8 +22,9 @@ meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material',
 
 file_path = 'data/output/New_Cycle_Data.csv'
 
-def get_record(filter: dict) -> dict:
-    formula = match(filter)
+
+def get_record(cell):
+    formula = f"{{Cell_Name}} = '{cell}'"
     api = Api(API_KEY)
     table = api.table(Base_id, Cycle_table)
     records = table.all(sort=['Cycle#'], fields=data_upload_columns,
@@ -70,15 +71,11 @@ def get_cell_list(meta_data_columns):
     records = table.all(sort=['Name'], cell_format='string', user_locale='en-nz',
                         time_zone='America/Los_Angeles', fields=meta_data_columns)
     cell_df = pd.DataFrame(record['fields'] for record in records)
-    cell_dict = cell_df.to_dict('records')
-    cell_list = cell_df['Name'].tolist()
-    cast_list = cell_df['Cast'].dropna().unique().tolist()
-    AAM_list = cell_df['AAM'].dropna().unique().tolist()
-    electrolyte_list = cell_df['Electrolyte'].dropna().unique().tolist()
-    return cell_dict, cell_list, cast_list, AAM_list, electrolyte_list
+    return cell_df
 
-def get_cell_record(filter:dict) -> dict:
-    formula = match(filter)
+
+def get_cell_record(cell):
+    formula = f"{{Name}} = '{cell}'"
     api = Api(API_KEY)
     table = api.table(Base_id, Cell_table)
     records = table.all(fields=meta_data_columns, cell_format='string', user_locale='en-nz',
