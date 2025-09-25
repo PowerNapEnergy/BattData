@@ -296,6 +296,6 @@ for file in files:
                                 cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
     print(filename)
 cycle_data = pd.DataFrame(cycle_data)
-#cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-#airtable.data_upload(cycle_data)
+cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
+airtable.data_upload(cycle_data)
 

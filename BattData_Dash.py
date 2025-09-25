@@ -62,17 +62,17 @@ app.layout = html.Div(
                             ], style={'display':'100%', 'border': '2px solid black'}),
                         html.Div(
                             [
-                                html.Div(
-                                    [
+                                html.Div([
                                         dcc.Graph(figure={'layout': {'title': 'Nyquist Plot'}}, id='eis')
-                                     ], style={'flex-basis': '50%', 'height': '100%'}),
+                                     ], style={'flex-basis': '50%', 'height': '100%'})
+                                ], style={}),
+                        html.Div(
+                             [
                                 html.Div(
-                                    [
-                                        html.Div(
-                                            [dcc.Graph(
-                                                figure={'layout': {'title': 'Cycle Data'}},
-                                                id='cycle_data')],
-                                            style={'flex-basis': '80%'}),
+                                       [dcc.Graph(
+                                          figure={'layout': {'title': 'Cycle Data'}},
+                                           id='cycle_data')],
+                                    style={'flex-basis': '80%'}),
                                         html.Div(
                                             [
                                                 html.Div(
@@ -90,9 +90,7 @@ app.layout = html.Div(
                                                              multi=True, value=[], placeholder='Select Cycles')
                                                         ], style={'flex-basis': '50%'})
                                             ], style={'display': 'flex', 'flexDirection': 'row', 'border': '2pt solid black', 'flex-basis': '20%'}),
-                                    ], style={'flex-basis': '50%', 'display': 'flex', 'flexDirection': 'column', 'border':'2pt solid yellow'})
-                            ], style={'display': 'flex', 'flexDirection': 'row',
-                                      'border': '4px dashed green', 'maxHeight': '800px'}),
+                                    ], style={'flex-basis': '50%', 'display': 'flex', 'flexDirection': 'column', 'border':'2pt solid yellow'}),
                     ], style={})
                 ])
 
