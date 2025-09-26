@@ -1,4 +1,4 @@
-from dash import Dash, html, dash_table, dcc, callback, Output, Input
+from dash import Dash, html, dash_table, dcc, callback, Output, Input, State
 import pandas as pd
 import os
 import plotly.graph_objects as go
@@ -11,6 +11,8 @@ from dotenv import load_dotenv
 #Load Data
 load_dotenv()
 Repository = os.getenv('Repository')
+dqdv_step = os.getenv('dqdv_diff')
+dqdv_smooth = os.getenv('dqdv_smooth')
 meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte', 'Cyc20vsAF_Retention']
 cell_df = airtable.get_cell_list(meta_data_columns)
 cell_df['id'] = cell_df['Name']
@@ -20,8 +22,41 @@ filter_choices = airtable.get_filter_choices(filter_options)
 cycles = ['1', '2', '3']
 test = airtable.get_record('C440')
 cells_chosen = []
+cycle_life_fig = go.Figure(layout=go.Layout(
+    title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5},
+    autotypenumbers='convert types',
+    height=600,
+    legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -.1}))
+eis_fig = go.Figure(layout=go.Layout(
+    title={'text': 'Nyquist Plot', 'xanchor': 'center', 'x': 0.5},
+    autotypenumbers='convert types',
+    height=600,
+    legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -.1}))
+cycle_data_fig = go.Figure(layout=go.Layout(
+    title={'text': 'Voltage Profile', 'xanchor': 'center', 'x': 0.5},
+    autotypenumbers='convert types',
+    height=600,
+    legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -0.1}))
 #records = pd.DataFrame(columns=meta_data_columns)
 #cycle_life = airtable.get_record({'Cell_Name': 'C432'})
+'''
+fig = go.Figure()
+cells = ['C441', 'C442']
+selected_cycles = ['0001']
+for cell in cells:
+    cell_directory = Repository + 'csv/' + cell + '/'
+    cycle_data = os.listdir(cell_directory)
+    for cycle in cycle_data:
+        filename = os.path.join(cell_directory, cycle)
+        cycle_number = cycle.split('_')[2]
+        if cycle_number in selected_cycles:
+            df = pd.read_csv(filename)
+            charge = df.loc[df['status'].isin(['charge'])]
+            charge_time = charge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
+            discharge = df.loc[df['status'].isin(['discharge'])]
+            discharge_time = discharge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
+'''
+
 
 #Initialize the App
 app = Dash()
@@ -58,26 +93,26 @@ app.layout = html.Div(
                                 dcc.RadioItems(id='cycle_life_view',
                                                 options=['Cell Capacity', 'Specific Capacity', 'Retention', 'Efficiency'],
                                                 value='Cell Capacity', inline=True),
-                                dcc.Graph(figure={'layout': {'title': 'Cycle Life'}}, id='cycle_life')
+                                dcc.Graph(figure=cycle_life_fig, id='cycle_life')
                             ], style={'display':'100%', 'border': '2px solid black'}),
                         html.Div(
                             [
                                 html.Div([
-                                        dcc.Graph(figure={'layout': {'title': 'Nyquist Plot'}}, id='eis')
+                                        dcc.Graph(figure=eis_fig, id='eis')
                                      ], style={'flex-basis': '50%', 'height': '100%'})
                                 ], style={}),
                         html.Div(
                              [
                                 html.Div(
                                        [dcc.Graph(
-                                          figure={'layout': {'title': 'Cycle Data'}},
-                                           id='cycle_data')],
+                                          figure=cycle_data_fig,
+                                           id='single_cycle_view')],
                                     style={'flex-basis': '80%'}),
                                         html.Div(
                                             [
                                                 html.Div(
                                                     [
-                                                        dcc.RadioItems(id='cell_view',
+                                                        dcc.RadioItems(id='cycle_view',
                                                                options=['Cell Capacity vs Voltage',
                                                                         'Specific Capacity vs Voltage',
                                                                         'Time vs Voltage',
@@ -86,7 +121,7 @@ app.layout = html.Div(
                                                         ], style={'flex-basis': '50%'}),
                                                 html.Div(
                                                     [
-                                                        dcc.Dropdown(id='cycle_selection', options=cycles,
+                                                        dcc.Dropdown(id='selected_cycles', options=cycles,
                                                              multi=True, value=[], placeholder='Select Cycles')
                                                         ], style={'flex-basis': '50%'})
                                             ], style={'display': 'flex', 'flexDirection': 'row', 'border': '2pt solid black', 'flex-basis': '20%'}),
@@ -96,6 +131,8 @@ app.layout = html.Div(
 
 
 # App Controls
+
+# Update DataTable
 @callback(Output(component_id='selected_cells', component_property='data'),
           Input(component_id='cell_table', component_property='selected_row_ids'))
 def update_selected_cells(selected_cells):
@@ -109,13 +146,56 @@ def update_selected_cells(selected_cells):
     selected_cell_data = records.to_dict('records')
     return selected_cell_data
 
+# Update Cycle Life Plot
+@callback(
+    Output(component_id='cycle_life', component_property='figure'),
+    [Input(component_id='selected_cells', component_property='data'),
+     Input(component_id='cycle_life_view', component_property='value')]
+)
+def update_cyclelife(cells_chosen, cycle_life_view):
+    fig = cycle_life_fig
+    fig.data = []
+    if cells_chosen is None:
+        cells_chosen = []
+    cells = [d['Name'] for d in cells_chosen if 'Name' in d]
+    for cell in cells:
+        cycle_life = airtable.get_record(cell)
+        if cycle_life_view == 'Cell Capacity':
+            fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
+                                      y=cycle_life['Cell_Discharge_Cap_mAh'],
+                                      mode='markers',
+                                      name=cell)])
+            fig.update_yaxes(title='Cell Capacity(mAh)')
+        elif cycle_life_view == 'Specific Capacity':
+            fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
+                                      y=cycle_life['AAM_Discharge_Cap_mAh/g'],
+                                      mode='markers',
+                                      name=cell)])
+            fig.update_yaxes(title='Specific Capacity (mAh/g)')
+        elif cycle_life_view == 'Retention':
+            fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
+                                      y=cycle_life['Retention_AF'],
+                                      mode='markers',
+                                      name=cell)])
+            fig.update_yaxes(title='Capacity Retention(%)')
+        elif cycle_life_view == 'Efficiency':
+            fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
+                                      y=cycle_life['Coulombic_Efficiency'],
+                                      mode='markers',
+                                      name=cell)])
+            fig.update_yaxes(title='Coulombic Efficiency(%)')
+    fig.update_xaxes(title='Cycle#')
+    return fig
 
+
+# Update EIS Plot
 @callback(
     Output(component_id='eis', component_property='figure'),
     Input(component_id='selected_cells', component_property='data')
 )
 def update_eis(cells_chosen):
-    fig = go.Figure()
+    fig = eis_fig
+    fig.data = []
     if cells_chosen is None:
         cells_chosen = []
     cells = [d['Name'] for d in cells_chosen if 'Name' in d]
@@ -165,169 +245,110 @@ def update_eis(cells_chosen):
                 x = df["Z' (Ω)"]
                 y = df['-Z'' (Ω)']
             fig.add_traces(go.Scatter(x=x, y=y, mode='lines+markers', name=plotname))
-    fig.update_layout(title={'text': 'Nyquist Plot', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types', height=600,
-                      legend=dict(orientation='h', yanchor='top', xanchor='left', y=-.1))
     fig.update_xaxes(title="Z'")
     fig.update_yaxes(scaleanchor='x', scaleratio=1.5, title='-Z"')
     return fig
 
-
+# Update Cycle List
 @callback(
-    Output(component_id='cycle_life', component_property='figure'),
-    [Input(component_id='selected_cells', component_property='data'),
-     Input(component_id='cycle_life_view', component_property='value')]
-)
-def update_cyclelife(cells_chosen, cycle_life_view):
-    fig = go.Figure()
-    if cells_chosen is None:
-        cells_chosen = []
-    cells = [d['Name'] for d in cells_chosen if 'Name' in d]
-    for cell in cells:
-        cycle_life = airtable.get_record(cell)
-        if cycle_life_view == 'Cell Capacity':
-            fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
-                                      y=cycle_life['Cell_Discharge_Cap_mAh'],
-                                      mode='markers',
-                                      name=cell))
-            fig.update_yaxes(title='Cell Capacity(mAh)')
-        elif cycle_life_view == 'Specific Capacity':
-            fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
-                                      y=cycle_life['AAM_Discharge_Cap_mAh/g'],
-                                      mode='markers',
-                                      name=cell))
-            fig.update_yaxes(title='Specific Capacity (mAh/g)')
-        elif cycle_life_view == 'Retention':
-            fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
-                                      y=cycle_life['Retention_AF'],
-                                      mode='markers',
-                                      name=cell))
-            fig.update_yaxes(title='Capacity Retention(%)')
-        elif cycle_life_view == 'Efficiency':
-            fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
-                                      y=cycle_life['Coulombic_Efficiency'],
-                                      mode='markers',
-                                      name=cell))
-            fig.update_yaxes(title='Coulombic Efficiency(%)')
-    fig.update_layout(title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types',
-                      legend=dict(orientation='h', yanchor='top', y=-.1))
-    fig.update_xaxes(title='Cycle#')
-    return fig
-
-
-@callback(
-    Output(component_id='cycle_data', component_property='figure'),
+    Output(component_id='selected_cycles', component_property='options'),
     Input(component_id='selected_cells', component_property='data')
 )
-def update_cycle(cells_chosen):
-    fig = go.Figure()
+def update_cycle_list(cells_chosen):
+    if cells_chosen is None:
+        cells_chosen=[]
+    cells = [d['Name'] for d in cells_chosen if 'Name' in d]
+    cycle_numbers = []
+    for cell in cells:
+        cell_directory = Repository + 'csv/' + cell + '/'
+        cycle_data = os.listdir(cell_directory)
+        for file in cycle_data:
+            file_path = os.path.join(cell_directory, file)
+            filename, extension = os.path.splitext(file)
+            cycle_number = filename.split('_')[2]
+            file_type = filename.split('_')[6]
+            if file_type == 'cycle':
+                cycle_numbers.append(cycle_number)
+            else:
+                continue
+    return cycle_numbers
+
+
+# Update Cycle Data Plot
+@callback(
+    Output(component_id='single_cycle_view', component_property='figure'),
+    [Input(component_id='selected_cells', component_property='data'),
+     Input(component_id='selected_cycles', component_property='value'),
+     Input(component_id='cycle_view', component_property='value')]
+)
+def update_single_cycle(cells_chosen, selected_cycles, cycle_view):
+    fig = cycle_data_fig
+    fig.data = []
     if cells_chosen is None:
         cells_chosen = []
     cells = [d['Name'] for d in cells_chosen if 'Name' in d]
     for cell in cells:
-        cycle_life = airtable.get_record(cell)
-        fig.add_traces(go.Scatter(x=cycle_life['Cycle#'],
-                                  y=cycle_life['Cell_Discharge_Cap_mAh'],
-                                  mode='markers',
-                                  name=cell))
-    fig.update_layout(title={'text': 'Cycle Data', 'xanchor': 'center', 'x': 0.5}, autotypenumbers='convert types',
-                          height=600,
-                          legend=dict(orientation='h', yanchor='top', y=-.1))
-    fig.update_xaxes(title='Cycle#')
-    return fig
-
-
-'''
-@callback(
-    Output(component_id='single_cycle', component_property='figure'),
-    [Input(component_id='multi_select_dropdown', component_property='value'), Input(component_id='cycles', component_property='value')]
-)
-def update_CapV(cells_chosen, cycles):
-    fig = go.Figure()
-    for cell in cells_chosen:
-        file_path = Repository + 'csv/' + cell + '/'
-        files = os.listdir(file_path)
-        for file in files:
-            filename = os.path.join(file_path, file)
-            cycle = file.split('_')[2]
-            if cycle in cycles:
+        cell_directory = Repository + 'csv/' + cell + '/'
+        cycle_data = os.listdir(cell_directory)
+        for cycle in cycle_data:
+            filename = os.path.join(cell_directory, cycle)
+            cycle_number = cycle.split('_')[2]
+            if cycle_number in selected_cycles:
                 df = pd.read_csv(filename)
                 charge = df.loc[df['status'].isin(['charge'])]
+                charge_time = charge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
                 discharge = df.loc[df['status'].isin(['discharge'])]
-                fig.add_traces(go.Scatter(x=charge['charge_capacity(mAh)'], y=charge['voltage(V)'], mode='line', name='Charge'))
-                fig.add_traces(go.Scatter(x=discharge['discharge_capacity(mAh)'], y=charge['voltage(V)'], mode='line', name='Discharge'))
+                discharge_time = discharge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
+#                dqdv_data = pd.DataFrame({
+#                    'step': df['step'], 'status': df['status'], 'current(mA)': df['current(mA)'],
+#                    'voltage(V)': df['voltage(V)'], 'DV': df['voltage(V)'].diff(dqdv_step),
+#                    'charge_capacity(mAh)': df['charge_capacity(mAh)'],
+#                    'dq_charge': df['charge_capacity(mAh)'].diff(dqdv_step),
+#                    'discharge_capacity(mAh)': df['discharge_capacity(mAh)'],
+#                    'dq_discharge': df['discharge_capacity(mAh)'].diff(dqdv_step)})
+#                dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
+#                dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
+#                dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
+#                dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
+#                dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=dqdv_smooth).mean()
+#                dqdv_charge = dqdv_data[dqdv_data['status'] == 'charge']
+#                dqdv_discharge = dqdv_data[dqdv_data['status'] == 'discharge']
+                if cycle_view == 'Cell Capacity vs Voltage':
+                    fig.add_traces([go.Scatter(x=discharge['discharge_capacity(mAh)'],
+                                               y=discharge['voltage(V)'],
+                                               mode='lines',
+                                               name=cell + '_Discharge'),
+                                go.Scatter(x=charge['charge_capacity(mAh)'],
+                                           y=charge['voltage(V)'],
+                                           mode='lines',
+                                           name=cell + '_Charge')])
+                    fig.update_xaxes(title='Cell Capacity (mAh)')
+                elif cycle_view == 'Specific Capacity vs Voltage':
+                    cell_aam_wt = airtable.get_AAM_Wt({'Name': cell})
+                    specific_charge = charge['charge_capacity(mAh)'] / cell_aam_wt
+                    specific_discharge = discharge['discharge_capacity(mAh)'] / cell_aam_wt
+                    fig.add_traces([go.Scatter(x=specific_discharge,
+                                               y=discharge['voltage(V)'],
+                                               mode='lines',
+                                               name=cell + '_Discharge'),
+                                    go.Scatter(x=specific_charge,
+                                               y=charge['voltage(V)'],
+                                               mode='lines',
+                                               name=cell + '_Charge')])
+                    fig.update_xaxes(title='Specific Capacity(mAh/g)')
+                elif cycle_view == 'Time vs Voltage':
+                    fig.add_traces([go.Scatter(x=discharge_time,
+                                               y=discharge['voltage(V)'],
+                                               mode='lines',
+                                               name=cell + '_Discharge'),
+                                   go.Scatter(x=charge_time,
+                                              y=charge['voltage(V)'],
+                                              mode='lines',
+                                              name=cell + '_Charge')])
+                    fig.update_xaxes(title='Step Time (s)', nticks=20)
+
     return fig
-    
-@callback(
-    Output(component_id='cycles', component_property='cycle_list'),
-    Input(component_id='cycle_life', component_property='cycle_list')
-)
-def update_cycles(cycle_list):
-    return cycle_list
 
-'''
-
-'''
-@callback(Output(component_id='cell_table', component_property='data'),
-          Input(component_id='cell_selector', component_property='value')
-          )
-def update_table(cells_chosen):
-    records = pd.DataFrame(columns=meta_data_columns)
-    for cell in cells_chosen:
-        record = airtable.get_cell_record({'Name': cell})
-        records = pd.concat([records, record], ignore_index=True)
-    cell_dict = records.to_dict('records')
-    return cell_dict
-'''
 
 if __name__ == '__main__':
     app.run(debug=True)
-
-
-
-#,
-#dcc.Graph(figure={}, id='single_cycle'),
-#dcc.Dropdown(id='cycles', options=cycle_list, multi=True, value=[]),
-
-'''
-html.Div(
-                                    [
-                                        html.P("Cell Selector"),
-                                        html.P("Filtering Options"),
-                                        html.Div(
-                                            [
-                                                html.Div(
-                                                    [
-                                                        html.P("Cell Type"),
-                                                        dcc.Dropdown(id='cell_type',
-                                                                     options=['All',
-                                                                              'Full Cell',
-                                                                              'Cathode Half Cell',
-                                                                              'Anode Half Cell'],
-                                                                     value=['Full Cell'])
-                                                    ], style={}),
-                                                html.Div(
-                                                    [
-                                                        html.P('Cast'),
-                                                        dcc.Dropdown(id='cast_name',
-                                                                     options=cast_names,
-                                                                        value=['Any'])
-                                                    ], style={}),
-                                                html.Div(
-                                                    [
-                                                        html.P('Anode Active Material'),
-                                                        dcc.Dropdown(id='AAM',
-                                                                        options=AAM_names,
-                                                                        value=['Any'])
-                                                    ], style={}),
-                                                html.Div(
-                                                    [
-                                                        html.P('Electrolyte'),
-                                                        dcc.Dropdown(id='Electrolyte',
-                                                                     options=electrolyte_names,
-                                                                     value=['Any'])
-                                                    ], style={'flex-basis': '10%'}),
-                                            ], style={'display': 'flex', 'flexDirection': 'column'}),
-                                        html.P("Cell Selection"),
-                                        dcc.Dropdown(id='cell_selector', options=cells, multi=True, value=[])
-                                    ], style={'flex-basis': '50%', 'border': '2px solid yellow'}),
-'''
