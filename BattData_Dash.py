@@ -11,8 +11,8 @@ from dotenv import load_dotenv
 #Load Data
 load_dotenv()
 Repository = os.getenv('Repository')
-dqdv_step = os.getenv('dqdv_diff')
-dqdv_smooth = os.getenv('dqdv_smooth')
+dqdv_step = int(os.getenv('dqdv_diff'))
+dqdv_smooth = int(os.getenv('dqdv_smooth'))
 meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte', 'Cyc20vsAF_Retention']
 cell_df = airtable.get_cell_list(meta_data_columns)
 cell_df['id'] = cell_df['Name']
@@ -299,29 +299,29 @@ def update_single_cycle(cells_chosen, selected_cycles, cycle_view):
                 charge_time = charge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
                 discharge = df.loc[df['status'].isin(['discharge'])]
                 discharge_time = discharge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
-#                dqdv_data = pd.DataFrame({
-#                    'step': df['step'], 'status': df['status'], 'current(mA)': df['current(mA)'],
-#                    'voltage(V)': df['voltage(V)'], 'DV': df['voltage(V)'].diff(dqdv_step),
-#                    'charge_capacity(mAh)': df['charge_capacity(mAh)'],
-#                    'dq_charge': df['charge_capacity(mAh)'].diff(dqdv_step),
-#                    'discharge_capacity(mAh)': df['discharge_capacity(mAh)'],
-#                    'dq_discharge': df['discharge_capacity(mAh)'].diff(dqdv_step)})
-#                dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
-#                dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
-#                dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
-#                dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
-#                dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=dqdv_smooth).mean()
-#                dqdv_charge = dqdv_data[dqdv_data['status'] == 'charge']
-#                dqdv_discharge = dqdv_data[dqdv_data['status'] == 'discharge']
+                dqdv_data = pd.DataFrame({
+                    'step': df['step'], 'status': df['status'], 'current(mA)': df['current(mA)'],
+                    'voltage(V)': df['voltage(V)'], 'DV': df['voltage(V)'].diff(dqdv_step),
+                    'charge_capacity(mAh)': df['charge_capacity(mAh)'],
+                    'dq_charge': df['charge_capacity(mAh)'].diff(dqdv_step),
+                    'discharge_capacity(mAh)': df['discharge_capacity(mAh)'],
+                    'dq_discharge': df['discharge_capacity(mAh)'].diff(dqdv_step)})
+                dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
+                dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
+                dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
+                dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
+                dqdv_data['smoothed_discharge'] = dqdv_data['dqdv_discharge'].rolling(window=dqdv_smooth).mean()
+                dqdv_charge = dqdv_data[dqdv_data['status'] == 'charge']
+                dqdv_discharge = dqdv_data[dqdv_data['status'] == 'discharge']
                 if cycle_view == 'Cell Capacity vs Voltage':
                     fig.add_traces([go.Scatter(x=discharge['discharge_capacity(mAh)'],
                                                y=discharge['voltage(V)'],
                                                mode='lines',
                                                name=cell + '_Discharge'),
-                                go.Scatter(x=charge['charge_capacity(mAh)'],
-                                           y=charge['voltage(V)'],
-                                           mode='lines',
-                                           name=cell + '_Charge')])
+                                    go.Scatter(x=charge['charge_capacity(mAh)'],
+                                               y=charge['voltage(V)'],
+                                               mode='lines',
+                                               name=cell + '_Charge')])
                     fig.update_xaxes(title='Cell Capacity (mAh)')
                 elif cycle_view == 'Specific Capacity vs Voltage':
                     cell_aam_wt = airtable.get_AAM_Wt({'Name': cell})
@@ -346,6 +346,16 @@ def update_single_cycle(cells_chosen, selected_cycles, cycle_view):
                                               mode='lines',
                                               name=cell + '_Charge')])
                     fig.update_xaxes(title='Step Time (s)', nticks=20)
+                elif cycle_view == 'dQ/dV':
+                    fig.add_traces([go.Scatter(x=dqdv_discharge['voltage(V)'],
+                                              y=dqdv_discharge['smoothed_discharge'],
+                                              mode='lines',
+                                              name=cell + '_' + cycle_number + '_Discharge'),
+                                   go.Scatter(x=dqdv_charge['voltage(V)'],
+                                              y=dqdv_charge['smoothed_charge'],
+                                              mode='lines',
+                                              name=cell + '_' + cycle_number + '_Charge')])
+                    fig.update_xaxes(title='Voltage')
 
     return fig
 

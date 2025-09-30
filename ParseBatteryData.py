@@ -169,7 +169,7 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
             name[1] = str(cycle).zfill(4)
         filename = '_'.join(name)
         cycleDF.to_csv(csv_path + '/' + filename + '_cycle.csv')
-        dqdv_data.to_csv(csv_path + '/' + filename + '_dqdv.csv')
+        #dqdv_data.to_csv(csv_path + '/' + filename + '_dqdv.csv')
         plotCapV(filename, cycleDF, cell_number, cell_aam_wt, cell_type, capVplot_path)
         plotdqdv(filename, dqdv_data, dqdvplot_path, cell_number, cycle)
     return cell_data
