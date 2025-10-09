@@ -6,6 +6,7 @@ from pyairtable import Api
 from pyairtable.formulas import match
 import airtable
 from dotenv import load_dotenv
+import json
 
 
 #Load Data
@@ -13,15 +14,22 @@ load_dotenv()
 Repository = os.getenv('Repository')
 dqdv_step = int(os.getenv('dqdv_diff'))
 dqdv_smooth = int(os.getenv('dqdv_smooth'))
-meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte', 'Cyc20vsAF_Retention']
-cell_df = airtable.get_cell_list(meta_data_columns)
+filter_names = os.getenv('Filter_Columns')
+cell_performance_names = os.getenv('Cell_Performance_Columns')
+
+#meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material', 'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte', 'Cyc20vsAF_Retention']
+filter_columns = filter_names.split(',')
+cell_performance_columns = cell_performance_names.split(',')
+cell_df = airtable.get_cell_list(filter_columns)
+performance_df = airtable.get_cell_list(cell_performance_columns)
 cell_df['id'] = cell_df['Name']
+performance_df['id'] = performance_df['Name']
+performance_df.set_index('id', inplace=True, drop=False)
 cell_df.set_index('id', inplace=True, drop=False)
-filter_options = ['Cell_Type', 'Cast', 'AAM', 'Electrolyte']
-filter_choices = airtable.get_filter_choices(filter_options)
-cycles = ['1', '2', '3']
+filter_choices = airtable.get_filter_choices(filter_columns)
 test = airtable.get_record('C440')
 cells_chosen = []
+cycles = []
 cycle_life_fig = go.Figure(layout=go.Layout(
     title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5},
     autotypenumbers='convert types',
@@ -37,8 +45,6 @@ cycle_data_fig = go.Figure(layout=go.Layout(
     autotypenumbers='convert types',
     height=600,
     legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -0.1}))
-#records = pd.DataFrame(columns=meta_data_columns)
-#cycle_life = airtable.get_record({'Cell_Name': 'C432'})
 '''
 fig = go.Figure()
 cells = ['C441', 'C442']
@@ -81,13 +87,16 @@ app.layout = html.Div(
                                                        selected_rows=[],
                                                        page_action='native',
                                                        page_current=0,
-                                                       page_size=10)
+                                                       page_size=10,
+                                                       style_table={'overflowX': 'auto'})
                                   ], style={}),
                         html.Div(
                             [dash_table.DataTable(id='selected_cells',
-                                                  data=cell_df.to_dict('records'),
-                                                  columns=[{'name': i, 'id': i} for i in cell_df.columns],
-                                                  row_deletable=True)], style={}),
+                                                  data=performance_df.to_dict('records'),
+                                                  columns=[{'name': i, 'id': i} for i in performance_df.columns],
+                                                  row_deletable=True,
+                                                  style_table={'overflowX': 'auto'})
+                                ], style={}),
                         html.Div(
                             [
                                 dcc.RadioItems(id='cycle_life_view',
@@ -138,7 +147,7 @@ app.layout = html.Div(
 def update_selected_cells(selected_cells):
     if selected_cells is None:
         selected_cells = []
-    records = pd.DataFrame(columns=meta_data_columns)
+    records = pd.DataFrame(columns=filter_columns)
     cells = cell_df['id'][selected_cells].tolist()
     for cell in cells:
         record = airtable.get_cell_record(cell)
@@ -266,7 +275,7 @@ def update_cycle_list(cells_chosen):
             file_path = os.path.join(cell_directory, file)
             filename, extension = os.path.splitext(file)
             cycle_number = filename.split('_')[2]
-            file_type = filename.split('_')[6]
+            file_type = filename.split('_')[-1]
             if file_type == 'cycle':
                 cycle_numbers.append(cycle_number)
             else:

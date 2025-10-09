@@ -19,6 +19,7 @@ dqdv_step = int(os.getenv('dqdv_diff'))
 dqdv_smooth = int(os.getenv('dqdv_smooth'))
 Directory = os.getenv('Directory')
 
+
 #setting up file tree
 if os.path.exists(Directory + 'input/'):
     input_path = Directory + 'input/'

@@ -11,7 +11,10 @@ def MoveFiles(Directory, Data_Repository):
     file_types = os.listdir(output_folder)
     for type in file_types:
         type_path = os.path.join(output_folder, type)
-        files = os.listdir(type_path)
+        if type_path == 'data/output/New_Cycle_Data.csv':
+            continue
+        else:
+            files = os.listdir(type_path)
         for file in files:
             file_path = os.path.join(type_path, file)
             filename, extension = os.path.splitext(file)

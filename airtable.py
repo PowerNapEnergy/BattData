@@ -4,12 +4,15 @@ from pyairtable import Api
 from pyairtable.formulas import match
 from pyairtable import Table
 import pandas as pd
+from collections import OrderedDict
 
 load_dotenv()
 API_KEY = os.getenv('API_KEY')
 Base_id = os.getenv('Base_id')
 Cell_table = os.getenv('Cell_table')
 Cycle_table = os.getenv('Cycle_table')
+filter_names = os.getenv('Filter_Columns')
+cell_performance_names = os.getenv('Cell_Performance_Columns')
 
 data_upload_columns = ['Cell_Name', 'Cycle#', 'Current_mA',
                        'Cell_Discharge_Cap_mAh', 'Cell_Charge_Cap_mAh',
@@ -19,6 +22,11 @@ data_upload_columns = ['Cell_Name', 'Cycle#', 'Current_mA',
 meta_data_columns = ['Name', 'Cell_Type', 'Cast', 'AAM', 'AAM_Material',
                      'AAM_Carbon_Type', 'N/P_Ratio', 'Electrolyte',
                      'Cyc20vsAF_Retention']
+
+filter_columns = filter_names.split(',')
+
+cell_performance_columns = cell_performance_names.split(',')
+
 
 file_path = 'data/output/New_Cycle_Data.csv'
 
@@ -65,24 +73,34 @@ def data_upload(New_Data_DF):
         else:
             create_record(data)
 
-def get_cell_list(meta_data_columns):
+def get_cell_list(table_columns):
     api = Api(API_KEY)
     table = api.table(Base_id, Cell_table)
     records = table.all(sort=['Name'], cell_format='string', user_locale='en-nz',
-                        time_zone='America/Los_Angeles', fields=meta_data_columns)
+                        time_zone='America/Los_Angeles', fields=table_columns)
     cell_df = pd.DataFrame(record['fields'] for record in records)
-    return cell_df
+    cell_df_filled = cell_df.fillna('Na')
+    cell_df_reordered = cell_df_filled[table_columns]
+    return cell_df_reordered
 
 
 def get_cell_record(cell):
     formula = f"{{Name}} = '{cell}'"
     api = Api(API_KEY)
     table = api.table(Base_id, Cell_table)
-    records = table.all(fields=meta_data_columns, cell_format='string', user_locale='en-nz',
+    records = table.all(fields=cell_performance_columns, cell_format='string', user_locale='en-nz',
                         time_zone='America/Los_Angeles',
                         formula=formula)
+    records_list = records[0]['fields']
+    for column in cell_performance_columns:
+        if column in records_list:
+            pass
+        else:
+            records_list[column] = ''
     result = pd.DataFrame(record["fields"] for record in records)
-    return result
+    result_filled = result.fillna('Na')
+    result_reordered = result_filled[cell_performance_columns]
+    return result_reordered
 
 def get_filter_choices(filter_options):
     #api = Api(API_KEY)
