@@ -45,6 +45,9 @@ cycle_data_fig = go.Figure(layout=go.Layout(
     autotypenumbers='convert types',
     height=600,
     legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -0.1}))
+
+table_1 = cell_df.to_dict('records')
+table_2= performance_df.to_dict('records')
 '''
 fig = go.Figure()
 cells = ['C441', 'C442']
@@ -151,9 +154,19 @@ def update_selected_cells(selected_cells):
     cells = cell_df['id'][selected_cells].tolist()
     for cell in cells:
         record = airtable.get_cell_record(cell)
+        record['id'] = record['Name']
         records = pd.concat([records, record], ignore_index=True)
     selected_cell_data = records.to_dict('records')
     return selected_cell_data
+
+
+@callback(Output(component_id='cell_table', component_property='selected_rows'),
+          Input(component_id='selected_cells', component_property='data'),
+          State(component_id='cell_table', component_property='data'))
+def update_cell_table(selected_cells, checked_cells):
+    active_cells = set(cell['id'] for cell in selected_cells)
+    new_active_cells = [i for i, cell in enumerate(checked_cells) if cell['id'] in active_cells]
+    return new_active_cells
 
 # Update Cycle Life Plot
 @callback(
