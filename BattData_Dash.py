@@ -27,7 +27,6 @@ performance_df['id'] = performance_df['Name']
 performance_df.set_index('id', inplace=True, drop=False)
 cell_df.set_index('id', inplace=True, drop=False)
 filter_choices = airtable.get_filter_choices(filter_columns)
-test = airtable.get_record('C440')
 cells_chosen = []
 cycles = []
 cycle_life_fig = go.Figure(layout=go.Layout(
@@ -46,9 +45,8 @@ cycle_data_fig = go.Figure(layout=go.Layout(
     height=600,
     legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -0.1}))
 
-table_1 = cell_df.to_dict('records')
-table_2= performance_df.to_dict('records')
 '''
+test = airtable.get_record('C440')
 fig = go.Figure()
 cells = ['C441', 'C442']
 selected_cycles = ['0001']
