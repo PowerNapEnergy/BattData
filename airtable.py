@@ -80,6 +80,7 @@ def get_cell_list(table_columns):
                         time_zone='America/Los_Angeles', fields=table_columns)
     cell_df = pd.DataFrame(record['fields'] for record in records)
     cell_df_filled = cell_df.fillna('Na')
+    cell_df_filled['First_Below_80%Ret']=cell_df_filled['First_Below_80%Ret'].astype(int)
     cell_df_reordered = cell_df_filled[table_columns]
     return cell_df_reordered
 
@@ -99,6 +100,7 @@ def get_cell_record(cell):
             records_list[column] = ''
     result = pd.DataFrame(record["fields"] for record in records)
     result_filled = result.fillna('Na')
+    result_filled['First_Below_80%Ret'] = result_filled['First_Below_80%Ret'].astype(int)
     result_reordered = result_filled[cell_performance_columns]
     return result_reordered
 

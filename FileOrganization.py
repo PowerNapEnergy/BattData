@@ -76,6 +76,25 @@ def MoveFiles(Directory, Data_Repository):
                     else:
                         continue
 
+def Organize_eis(Repository):
+    eis_folder = Repository + 'eis/'
+    eis_files = os.listdir(eis_folder)
+    for file in eis_files:
+        eis_path = os.path.join(eis_folder, file)
+        if os.path.isdir(eis_path):
+            pass
+        else:
+            cell_number = file.split('_')[0]
+            cell_eis_path = eis_folder + cell_number
+            if os.path.exists(cell_eis_path):
+                if os.path.exists(cell_eis_path + '/' + file):
+                    os.remove(eis_path)
+                else:
+                    shutil.move(eis_path, cell_eis_path)
+            else:
+                os.mkdir(cell_eis_path)
+                shutil.move(eis_path, cell_eis_path)
 
-MoveFiles(Directory, Repository)
 
+#MoveFiles(Directory, Repository)
+Organize_eis(Repository)
