@@ -12,8 +12,8 @@ import json
 #Load Data
 load_dotenv()
 Repository = os.getenv('Repository')
-dqdv_step = int(os.getenv('dqdv_diff'))
-dqdv_smooth = int(os.getenv('dqdv_smooth'))
+#dqdv_step = int(os.getenv('dqdv_diff'))
+#dqdv_smooth = int(os.getenv('dqdv_smooth'))
 filter_names = os.getenv('Filter_Columns')
 cell_performance_names = os.getenv('Cell_Performance_Columns')
 
@@ -29,6 +29,7 @@ cell_df.set_index('id', inplace=True, drop=False)
 filter_choices = airtable.get_filter_choices(filter_columns)
 cells_chosen = []
 cycles = []
+eis_plots = []
 cycle_life_fig = go.Figure(layout=go.Layout(
     title={'text': 'Cycle Life', 'xanchor': 'center', 'x': 0.5},
     autotypenumbers='convert types',
@@ -44,6 +45,8 @@ cycle_data_fig = go.Figure(layout=go.Layout(
     autotypenumbers='convert types',
     height=600,
     legend={'orientation': 'h', 'yanchor': 'top', 'xanchor': 'left', 'y': -0.1}))
+plot_colors = ['1', '2', '3']
+marker_types = ['4', '5', '6']
 
 '''
 test = airtable.get_record('C440')
@@ -88,7 +91,7 @@ app.layout = html.Div(
                                                        selected_rows=[],
                                                        page_action='native',
                                                        page_current=0,
-                                                       page_size=10,
+                                                       page_size=20,
                                                        style_table={'overflowX': 'auto'})
                                   ], style={}),
                         html.Div(
@@ -97,7 +100,7 @@ app.layout = html.Div(
                                                   columns=[{'name': i, 'id': i} for i in performance_df.columns],
                                                   row_deletable=True,
                                                   style_table={'overflowX': 'auto'})
-                                ], style={}),
+                             ], style={}),
                         html.Div(
                             [
                                 dcc.RadioItems(id='cycle_life_view',
@@ -108,9 +111,13 @@ app.layout = html.Div(
                         html.Div(
                             [
                                 html.Div([
+                                    dcc.Dropdown(id='eis_options', options=eis_plots,
+                                                 multi=True, value=[], placeholder='Select Cycles')
+                                ], style={'flex-basis': '25%'}),
+                                html.Div([
                                         dcc.Graph(figure=eis_fig, id='eis')
                                      ], style={'flex-basis': '50%', 'height': '100%'})
-                                ], style={}),
+                                ], style={'flex-basis': '75%'}),
                         html.Div(
                              [
                                 html.Div(
@@ -131,11 +138,42 @@ app.layout = html.Div(
                                                         ], style={'flex-basis': '50%'}),
                                                 html.Div(
                                                     [
-                                                        dcc.Dropdown(id='selected_cycles', options=cycles,
-                                                             multi=True, value=[], placeholder='Select Cycles')
-                                                        ], style={'flex-basis': '50%'})
-                                            ], style={'display': 'flex', 'flexDirection': 'row', 'border': '2pt solid black', 'flex-basis': '20%'}),
-                                    ], style={'flex-basis': '50%', 'display': 'flex', 'flexDirection': 'column', 'border':'2pt solid yellow'}),
+                                                        html.Div(
+                                                            [
+                                                                dcc.Dropdown(id='selected_cycles',
+                                                                             options=cycles,
+                                                                             multi=True,
+                                                                             value=[],
+                                                                             placeholder='Select Cycles')
+                                                            ]),
+                                                        html.Div(
+                                                            [
+                                                                html.Div(
+                                                                    [
+                                                                        html.H2('dQdV Step Size',
+                                                                                style={'fontSize': 20}),
+                                                                        dcc.Input(id='dqdv_div',
+                                                                                  value='5',
+                                                                                  type='number')
+                                                                        ], style={'display': 'inline-block'}),
+                                                                html.Div(
+                                                                    [
+                                                                        html.H2('dQdV Smoothing',
+                                                                                style={'fontSize': 20}),
+                                                                        dcc.Input(id='dqdv_smooth',
+                                                                                  value='5',
+                                                                                  type='number')
+                                                                    ], style={'display': 'inline-block'}),
+                                                            ])
+                                                        ], style={'flex-basis': '50%'}),
+                                            ], style={'display': 'flex',
+                                                      'flexDirection': 'row',
+                                                      'border': '2pt solid black',
+                                                      'flex-basis': '20%'}),
+                                    ], style={'flex-basis': '50%',
+                                              'display': 'flex',
+                                              'flexDirection': 'column',
+                                              'border': '2pt solid yellow'}),
                     ], style={})
                 ])
 
@@ -207,66 +245,108 @@ def update_cyclelife(cells_chosen, cycle_life_view):
     fig.update_xaxes(title='Cycle#')
     return fig
 
+# Update EIS Options
+
+@callback(
+    Output(component_id='eis_options', component_property='options'),
+    Input(component_id='selected_cells', component_property='data')
+)
+
+def update_eis_options(cells_chosen):
+    if cells_chosen is None:
+        cells_chosen = []
+    cells = [d['Name'] for d in cells_chosen if 'Name' in d]
+    eis_options = []
+    for cell in cells:
+        file_path = Repository + 'eis/' + cell
+        cell_data = os.listdir(file_path)
+        for data in cell_data:
+            filename, extension = os.path.splitext(data)
+            cycle = filename.split('_')[1]
+            eis_options.append(cycle)
+    eis_options = list(set(eis_options))
+    return eis_options
 
 # Update EIS Plot
 @callback(
     Output(component_id='eis', component_property='figure'),
-    Input(component_id='selected_cells', component_property='data')
+    [Input(component_id='selected_cells', component_property='data'),
+     Input(component_id='eis_options', component_property='value')]
 )
-def update_eis(cells_chosen):
+def update_eis(cells_chosen, plots_chosen):
     fig = eis_fig
     fig.data = []
     if cells_chosen is None:
         cells_chosen = []
+    if plots_chosen is None:
+        plots_chosen = []
     cells = [d['Name'] for d in cells_chosen if 'Name' in d]
     for cell in cells:
         file_path = Repository + 'eis/' + cell
         data_to_plot = os.listdir(file_path)
         for data in data_to_plot:
-            data_path = os.path.join(file_path, data)
-            df = pd.read_excel(data_path)
             filename, extension = os.path.splitext(data)
-            if filename[4] == '_':
-                testdata = filename.split('_')
-                if len(testdata) == 2:
-                    cell = testdata[0]
-                    cycle = testdata[1]
-                    extra = ''
-                elif len(testdata) == 3:
-                    cell = testdata[0]
-                    cycle = testdata[1]
-                    extra = testdata[2]
-                if cycle[5] == '0':
-                    if cycle[6] == '0':
-                        cyclename = 'Cy' + cycle[7] + cycle[8]
+            cycle_number = filename.split('_')[1]
+            if cycle_number in plots_chosen:
+                data_path = os.path.join(file_path, data)
+                df = pd.read_excel(data_path)
+                if filename[4] == '_':
+                    testdata = filename.split('_')
+                    if len(testdata) == 2:
+                        cell = testdata[0]
+                        cycle = testdata[1]
+                        extra = ''
+                    elif len(testdata) == 3:
+                        cell = testdata[0]
+                        cycle = testdata[1]
+                        extra = testdata[2]
+                    elif len(testdata) == 4:
+                        cell = testdata[0]
+                        cycle = testdata[1]
+                        cycler = testdata[2]
+                        extra = testdata[3]
+                    if cycle[5] == '0':
+                        if cycle[6] == '0':
+                            cyclename = 'Cy' + cycle[7] + cycle[8]
+                        else:
+                            cyclename = 'Cy' + cycle[6] + cycle[7] + cycle[8]
                     else:
-                        cyclename = 'Cy' + cycle[6] + cycle[7] + cycle[8]
+                        cyclename = 'Cy' + cycle[5] + cycle[6] + cycle[7] + cycle[8]
+                    if len(testdata) == 2:
+                        plotname = cell + '_' + cyclename
+                    elif len(testdata) == 3:
+                        plotname = cell + '_' + cyclename + '_' + extra
+                    elif len(testdata) == 4:
+                        plotname = cell + '_' + cyclename + '_' + cycler + '_' + extra
                 else:
-                    cyclename = 'Cy' + cycle[5] + cycle[6] + cycle[7] + cycle[8]
-                if len(testdata) == 2:
-                    plotname = cell + '_' + cyclename
-                elif len(testdata) == 3:
-                    plotname = cell + '_' + cyclename + '_' + extra
-            else:
-                plotname = filename
-            num_columns = len(df.columns)
-            if df.columns[0] == 'Column 1':
+                    plotname = filename
+                num_columns = len(df.columns)
                 if num_columns == 2:
-                    x = df['Column 1']
-                    y = df['Column 2']
+                    x = df[df.columns[0]]
+                    y = df[df.columns[1]]
                 elif num_columns == 3:
-                    x = df['Column 2']
-                    y = df['Column 3']
-                elif num_columns == 6:
-                    x = df['Column 2']
-                    y = df['Column 3']
-            elif df.columns[0] == 'Frequency (Hz)':
-
-                x = df["Z' (Ω)"]
-                y = df['-Z'' (Ω)']
-            fig.add_traces(go.Scatter(x=x, y=y, mode='lines+markers', name=plotname))
-    fig.update_xaxes(title="Z'")
-    fig.update_yaxes(scaleanchor='x', scaleratio=1.5, title='-Z"')
+                    x = df[df.columns[1]]
+                    y = df[df.columns[2]]
+                else:
+                    if df.columns[0] == 'Column 1':
+                        if num_columns == 6:
+                            x = df['Column 2']
+                            y = df['Column 3']
+                    elif df.columns[0] == 'Frequency (Hz)':
+                        x = df["Z' (Ω)"]
+                        y = df['-Z'' (Ω)']
+                    elif df.columns[0] == 'freq / Hz':
+                        x = df[df.columns[4]]
+                        y = df[df.columns[5]]
+                    elif df.columns[0] == 'freq/Hz':
+                        x = df[df.columns[1]]
+                        y = df[df.columns[2]]
+                    elif df.columns[0] == 'Frequency':
+                        x = df[df.columns[1]]
+                        y = df[df.columns[2]]
+                fig.add_traces(go.Scatter(x=x, y=y, mode='lines+markers', name=plotname))
+        fig.update_xaxes(title="Z'")
+        fig.update_yaxes(scaleanchor='x', scaleratio=1.5, title='-Z"')
     return fig
 
 # Update Cycle List
@@ -299,11 +379,15 @@ def update_cycle_list(cells_chosen):
     Output(component_id='single_cycle_view', component_property='figure'),
     [Input(component_id='selected_cells', component_property='data'),
      Input(component_id='selected_cycles', component_property='value'),
-     Input(component_id='cycle_view', component_property='value')]
+     Input(component_id='cycle_view', component_property='value'),
+     Input(component_id='dqdv_div', component_property='value'),
+     Input(component_id='dqdv_smooth', component_property='value')]
 )
-def update_single_cycle(cells_chosen, selected_cycles, cycle_view):
+def update_single_cycle(cells_chosen, selected_cycles, cycle_view, dqdv_div, dqdv_avg):
     fig = cycle_data_fig
     fig.data = []
+    dqdv_step = int(dqdv_div)
+    dqdv_smooth = int(dqdv_avg)
     if cells_chosen is None:
         cells_chosen = []
     cells = [d['Name'] for d in cells_chosen if 'Name' in d]
@@ -313,12 +397,17 @@ def update_single_cycle(cells_chosen, selected_cycles, cycle_view):
         for cycle in cycle_data:
             filename = os.path.join(cell_directory, cycle)
             cycle_number = cycle.split('_')[2]
+            cell_tester = cycle.split('_')[4]
             if cycle_number in selected_cycles:
                 df = pd.read_csv(filename)
                 charge = df.loc[df['status'].isin(['charge'])]
-                charge_time = charge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
                 discharge = df.loc[df['status'].isin(['discharge'])]
-                discharge_time = discharge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
+                if cell_tester == 'Biologic':
+                    charge_time = charge['step_time']
+                    discharge_time = discharge['step_time']
+                else:
+                    charge_time = charge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
+                    discharge_time = discharge['step_time'].apply(lambda x: f"{x // 3600}Hr:{(x % 3600) // 60}Mn")
                 dqdv_data = pd.DataFrame({
                     'step': df['step'], 'status': df['status'], 'current(mA)': df['current(mA)'],
                     'voltage(V)': df['voltage(V)'], 'DV': df['voltage(V)'].diff(dqdv_step),
@@ -326,7 +415,7 @@ def update_single_cycle(cells_chosen, selected_cycles, cycle_view):
                     'dq_charge': df['charge_capacity(mAh)'].diff(dqdv_step),
                     'discharge_capacity(mAh)': df['discharge_capacity(mAh)'],
                     'dq_discharge': df['discharge_capacity(mAh)'].diff(dqdv_step)})
-                dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
+                dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.0001]
                 dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
                 dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
                 dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']

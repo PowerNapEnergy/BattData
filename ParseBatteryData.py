@@ -9,6 +9,8 @@ import math
 #imports from other github users
 import electrochem as echem
 import NewareNDA
+from galvani import BioLogic
+from pypalmsens import load_session_file
 
 #imports from this project
 import airtable
@@ -86,6 +88,30 @@ def convertdf(df, extension, filename):
         converted_df.loc[converted_df['current(mA)'] == 0, 'status'] = 'rest'
         converted_df.loc[converted_df['current(mA)'] < 0, 'status'] = 'discharge'
         converted_df.loc[converted_df['current(mA)'] > 0, 'status'] = 'charge'
+    elif extension == '.csv':
+        converted_df['control/V'] = df['control/V']
+        converted_df['control/mA'] = df['control/mA']
+        converted_df['control'] = df['control/V'] + df['control/mA']
+        converted_df['datetime'] = df['time/s']
+        converted_df['step_time'] = df['time/s']
+        converted_df['cycle'] = df['cycle number'] + 1
+        converted_df['current(mA)'] = df['I/mA']
+        converted_df['voltage(V)'] = df['Ecell/V']
+        converted_df['charge_capacity(mAh)'] = df['Q charge/mA.h']
+        converted_df['discharge_capacity(mAh)'] = df['Q discharge/mA.h']
+        converted_df.loc[(converted_df['control/V'] == 0) & (converted_df['control/mA'] == 0), 'status'] = 'rest'
+        converted_df.loc[(converted_df['control/V'] == 0) & (converted_df['control/mA'] < 0), 'status'] = 'discharge'
+        converted_df.loc[(converted_df['control/V'] == 0) & (converted_df['control/mA'] > 0), 'status'] = 'charge'
+        converted_df.loc[(converted_df['control/V'] > converted_df['voltage(V)']) & (converted_df['control/mA'] == 0), 'status'] = 'charge'
+        converted_df.loc[(converted_df['control/V'] < converted_df['voltage(V)']) & (converted_df['control/mA'] == 0), 'status'] = 'rest'
+        converted_df['step'] = (converted_df['control'] != converted_df['control'].shift()).cumsum()
+        steps = converted_df['step'].unique().tolist()
+        '''
+        for step in steps:
+            stepDF = converted_df.loc[converted_df['step'].isin([step])]
+            stepDF['step_time'] = range(len(stepDF))
+            converted_df.loc[converted_df['step'] == step, 'step_time'] = stepDF['step_time']
+        '''
     return converted_df
 
 
@@ -146,10 +172,11 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
                         cycleDF.loc[cycleDF['step'] == charge_steps[1], 'charge_capacity(mAh)'].iloc[-1])
             discharge_capacity = float(cycleDF.loc[cycleDF['status'] == 'discharge', 'discharge_capacity(mAh)'].iloc[-1])
             cycle_data = {'cell_name': cell_number,
-                                        'cycle#': cycle,
-                                        'current_mA': current,
-                                        'discharge_capacity(mAh)': discharge_capacity,
-                                        'charge_capacity(mAh)': charge_capacity}
+                          'cycle#': cycle,
+                          'current_mA': current,
+                          'discharge_capacity(mAh)': discharge_capacity,
+                          'charge_capacity(mAh)': charge_capacity}
+
             dqdv_data = pd.DataFrame({
                 'step': cycleDF['step'], 'status': cycleDF['status'], 'current(mA)': cycleDF['current(mA)'],
                 'voltage(V)': cycleDF['voltage(V)'], 'DV': cycleDF['voltage(V)'].diff(dqdv_step),
@@ -157,7 +184,7 @@ def splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycl
                 'dq_charge': cycleDF['charge_capacity(mAh)'].diff(dqdv_step),
                 'discharge_capacity(mAh)': cycleDF['discharge_capacity(mAh)'],
                 'dq_discharge': cycleDF['discharge_capacity(mAh)'].diff(dqdv_step)})
-            dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.001]
+            dqdv_data = dqdv_data[abs(dqdv_data['DV']) > 0.0001]
             dqdv_data['dqdv_charge'] = dqdv_data['dq_charge'] / dqdv_data['DV']
             dqdv_data['smoothed_charge'] = dqdv_data['dqdv_charge'].rolling(window=dqdv_smooth).mean()
             dqdv_data['dqdv_discharge'] = dqdv_data['dq_discharge'] / dqdv_data['DV']
@@ -229,11 +256,6 @@ def plotdqdv(filename, dqdv_data, output_path, cell_number, cycle):
     plt.savefig(output_path + '/' + plot_name)
     plt.clf()
 
-
-#setting up dataframes
-cycle_data = []
-updated_cells = []
-
 '''
 main function-takes files from input folder and produces:
         1) A csv for each individual cycle
@@ -241,62 +263,115 @@ main function-takes files from input folder and produces:
         3) a Capacity vs Voltage Plot for each cycle for each cell
         4) a dqdv plot for each cycle for each cell
 '''
-files = os.listdir(input_path)
-for file in files:
-    file_path = os.path.join(input_path, file)
-    filename, extension = os.path.splitext(file)
-    #parse filename
-    if filename[0] =='P': #old naming convention
-        cell_number = file.split('_')[1]
-        cycle_number = file.split('_')[2].replace('Cycle',"")
-        if "-" in cycle_number:
-            if cycle_number[3] == '-':
-                start_cycle = int(cycle_number[1:3])
-                end_cycle = int(cycle_number[4:])
-            elif cycle_number[4] == '-':
-                starting_cycle = int(cycle_number[1:4])
-                end_cycle = int(cycle_number[5:])
-        else:
-            start_cycle = end_cycle = int(cycle_number)
-        cell_type = file.split('_')[3]
-        cell_tester = file.split('_')[4]
-    elif filename[0] == 'C': #new naming convention
-        cell_number = file.split('_')[0]
-        cycle_number = file.split('_')[1]
-        if "-" in cycle_number:
-            cycle_range = cycle_number.split('-')
-            start_cycle = int(cycle_range[0])
-            end_cycle = int(cycle_range[1])
-        else:
-            start_cycle = end_cycle = int(cycle_number)
-        cell_type = file.split('_')[2]
-        cell_tester = file.split('_')[3]
 
-    #identify filetype
-    if extension == '.res':
-        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
-        df = echem.parseArbin(file_path)
-        df = convertdf(df, extension, filename)
-    elif extension == '.ndax':
-        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
-        df = NewareNDA.read(file_path, cycle_mode='auto')
-        df = convertdf(df, extension, filename)
-    elif extension == '.csv':
-        df = pd.read_csv(file_path)
-        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
-    elif extension == '.xlsx':
-        df = pd.read_excel(file_path)
-        cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
-    elif filename == '.gitkeep':
-        continue
+
+def main(input_path):
+    cycle_data = []
+    updated_cells = []
+    if os.path.isdir(input_path):
+        files = os.listdir(input_path)
+        for file in files:
+            file_path = os.path.join(input_path, file)
+            filename, extension = os.path.splitext(file)
+            #parse filename
+            if filename[0] =='P': #old naming convention PN_CXXX_CyclesXX-XX_TYPE_TESTER_FORMAT
+                cell_number = filename.split('_')[1]
+                cycle_number = filename.split('_')[2].replace('Cycle',"")
+                if "-" in cycle_number:
+                    if cycle_number[3] == '-':
+                        start_cycle = int(cycle_number[1:3])
+                        end_cycle = int(cycle_number[4:])
+                    elif cycle_number[4] == '-':
+                        start_cycle = int(cycle_number[1:4])
+                        end_cycle = int(cycle_number[5:])
+                else:
+                    start_cycle = end_cycle = int(cycle_number)
+                cell_type = filename.split('_')[3]
+                cell_tester = filename.split('_')[4]
+                extra = filename.split('_')[5]
+            elif filename[0] == 'C': #new naming convention CXXX_XX-XX_TYPE_TESTER_FORMAT
+                cell_number = filename.split('_')[0]
+                cycle_number = filename.split('_')[1]
+                if "-" in cycle_number: #Cycler File: CXXX_XX-XX_TYPE_TESTER_FORMAT
+                    cycle_range = cycle_number.split('-')
+                    start_cycle = int(cycle_range[0])
+                    end_cycle = int(cycle_range[1])
+                else:
+                    if cycle_number[0] == 'C': #EIS_File: CXXX_CycleXXXX_TYPE_TESTER_EXTRA
+                        start_cycle = end_cycle = int(cycle_number[5:])
+                    elif cycle_number[0] == '0': #Cycler File: CXXX_XXXX_TYPE_TESTER_FORMAT
+                        start_cycle = end_cycle = int(cycle_number)
+                    elif cycle_number[0] == '1': #Cycler File: CXXX_XXXX_TYPE_TESTER_FORMAT
+                        start_cycle = end_cycle = int(cycle_number)
+                cell_type = filename.split('_')[2]
+                cell_tester = filename.split('_')[3]
+                if len(filename.split('_')) >= 5:
+                    extra = filename.split('_')[4]
+                else:
+                    extra = ' '
+        #identify filetype
+            if extension == '.res':
+                cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+                df = echem.parseArbin(file_path)
+                df = convertdf(df, extension, filename)
+            elif extension == '.ndax':
+                cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+                df = NewareNDA.read(file_path, cycle_mode='auto')
+                df = convertdf(df, extension, filename)
+            elif extension == '.mpr':
+                #cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+                mpr_file = BioLogic.MPRfile(file_path)
+                df = pd.DataFrame(mpr_file.data)
+                df.to_excel(output_path + '/' + cell_number + '_' + cycle_number + '_'
+                            + cell_tester + '_' + extra + '.xlsx', index=False)
+                continue
+            elif extension =='.mpt':
+                cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+                df = pd.read_csv(file_path, skiprows=71)
+                df = convertdf(df, extension, filename)
+            elif extension == '.pssession':
+                cells = cell_number.split('-')
+                measurements = load_session_file(file_path)
+                measurement = measurements[0]
+                eis = measurement.eis_data
+                tests = list(range(len(eis)))
+                for test in tests:
+                    cell_number = cells[test]
+                    eis_data = eis[test]
+                    data = eis_data.dataset.to_dataframe()
+                    df = data[['Frequency', 'ZRe', 'ZIm']]
+                    df.to_excel(output_path + '/' + cell_number + '_' + cycle_number + '_'
+                                + cell_tester + '_' + extra + '.xlsx', index=False)
+                continue
+            elif extension == '.csv':
+                if cell_tester == 'Biologic':
+                    cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+                    df = pd.read_csv(file_path, sep=',', dtype={'cycle number': int})
+                    #df = pd.read_csv(file_path, sep=';', dtype={'cycle number': int})
+                    df = convertdf(df, extension, filename)
+                else:
+                    cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+                    df = pd.read_csv(file_path)
+            elif extension == '.xlsx':
+                df = pd.read_excel(file_path)
+                cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
+            elif filename == '.gitkeep':
+                continue
+            else:
+                print("unknown format" + filename)
+            cycle_data = splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number,
+                                        start_cycle, end_cycle, cycle_data, output_path,
+                                        csv_path, capVplot_path, dqdvplot_path)
+            print(filename)
+        cycle_data = pd.DataFrame(cycle_data)
+        cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
     else:
-        print("unknown format" + filename)
+        cycle_data = pd.read_csv(input_path)
+    airtable.data_upload(cycle_data)
 
 
-    cycle_data = splitcycledata(filename, df, cell_aam_wt, cell_type, cell_number, start_cycle, end_cycle,
-                                cycle_data, output_path, csv_path, capVplot_path, dqdvplot_path)
-    print(filename)
-cycle_data = pd.DataFrame(cycle_data)
-cycle_data.to_csv(output_path + '/' + 'New_Cycle_Data' + '.csv', index=False)
-airtable.data_upload(cycle_data)
+main(input_path)
+# main(output_path + '/' + 'New_Cycle_Data' + '.csv')
+
+
 

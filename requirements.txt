@@ -9,3 +9,5 @@ pyairtable
 dotenv
 dash
 openpyxl
+galvani
+pypalmsens
