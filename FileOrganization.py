@@ -96,5 +96,5 @@ def Organize_eis(Repository):
                 shutil.move(eis_path, cell_eis_path)
 
 
-#MoveFiles(Directory, Repository)
+MoveFiles(Directory, Repository)
 Organize_eis(Repository)

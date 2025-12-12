@@ -102,8 +102,10 @@ def convertdf(df, extension, filename):
         converted_df.loc[(converted_df['control/V'] == 0) & (converted_df['control/mA'] == 0), 'status'] = 'rest'
         converted_df.loc[(converted_df['control/V'] == 0) & (converted_df['control/mA'] < 0), 'status'] = 'discharge'
         converted_df.loc[(converted_df['control/V'] == 0) & (converted_df['control/mA'] > 0), 'status'] = 'charge'
-        converted_df.loc[(converted_df['control/V'] > converted_df['voltage(V)']) & (converted_df['control/mA'] == 0), 'status'] = 'charge'
-        converted_df.loc[(converted_df['control/V'] < converted_df['voltage(V)']) & (converted_df['control/mA'] == 0), 'status'] = 'rest'
+        converted_df.loc[(converted_df['control/V'] > 3.5) & (converted_df['control/mA'] == 0), 'status'] = 'charge'
+        converted_df.loc[(converted_df['control/V'] < 1.5) &
+                         (converted_df['control/V'] > 0.0001) &
+                         (converted_df['control/mA'] == 0), 'status'] = 'discharge'
         converted_df['step'] = (converted_df['control'] != converted_df['control'].shift()).cumsum()
         steps = converted_df['step'].unique().tolist()
         '''
@@ -346,7 +348,7 @@ def main(input_path):
             elif extension == '.csv':
                 if cell_tester == 'Biologic':
                     cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
-                    df = pd.read_csv(file_path, sep=',', dtype={'cycle number': int})
+                    df = pd.read_csv(file_path, sep=',')
                     #df = pd.read_csv(file_path, sep=';', dtype={'cycle number': int})
                     df = convertdf(df, extension, filename)
                 else:

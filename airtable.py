@@ -41,6 +41,7 @@ def get_record(cell):
     result = pd.DataFrame(record['fields'] for record in records)
     return result
 
+
 def get_AAM_Wt(filter: dict) -> dict:
     formula = match(filter)
     api = Api(API_KEY)
@@ -50,13 +51,16 @@ def get_AAM_Wt(filter: dict) -> dict:
     cell_aam_wt = float(cell_aam_df['g_AAM_Active'][0])
     return cell_aam_wt
 
+
 def create_record(record: dict) -> dict:
     api = Api(API_KEY)
     table = api.table(Base_id, Cycle_table)
     result = table.create(record)
     return result
 
+
 def data_upload(New_Data_DF):
+    api = Api(API_KEY)
     for index, row in New_Data_DF.iterrows():
         Cell_Name = row["cell_name"]
         Cycle = row["cycle#"]
@@ -65,13 +69,14 @@ def data_upload(New_Data_DF):
         Cell_Charge_Cap_mAh = row['charge_capacity(mAh)']
         data = {'Cell_Name': Cell_Name, 'Cycle#': Cycle, 'Current_mA': Current_mA,
                 'Cell_Discharge_Cap_mAh': Cell_Discharge_Cap_mAh, 'Cell_Charge_Cap_mAh': Cell_Charge_Cap_mAh}
-        cycle_table = Table(API_KEY, Base_id, Cycle_table)
+        cycle_table = api.table(Base_id, Cycle_table)
         formula = f"AND({{Cell_Name}} = '{Cell_Name}', {{Cycle#}} = '{Cycle}')"
         records = cycle_table.all(formula=formula)
         if records:
             print("Entry already exists:", records[0]['fields']['Name'])
         else:
             create_record(data)
+
 
 def get_cell_list(table_columns):
     api = Api(API_KEY)
@@ -80,7 +85,7 @@ def get_cell_list(table_columns):
                         time_zone='America/Los_Angeles', fields=table_columns)
     cell_df = pd.DataFrame(record['fields'] for record in records)
     cell_df_filled = cell_df.fillna('Na')
-    cell_df_filled['First_Below_80%Ret']=cell_df_filled['First_Below_80%Ret'].astype(int)
+    cell_df_filled['First_Below_80%Ret'] = cell_df_filled['First_Below_80%Ret'].astype(int)
     cell_df_reordered = cell_df_filled[table_columns]
     return cell_df_reordered
 
@@ -103,19 +108,3 @@ def get_cell_record(cell):
     result_filled['First_Below_80%Ret'] = result_filled['First_Below_80%Ret'].astype(int)
     result_reordered = result_filled[cell_performance_columns]
     return result_reordered
-
-def get_filter_choices(filter_options):
-    #api = Api(API_KEY)
-    #table = api.table(Base_id, Cell_table)
-    #records = table.all(fields=filter_options, cell_format='string')
-    #result = pd.DataFrame(record["fields"] for record in records)
-    result = ['A', 'B', 'C']
-    return result
-
-'''
-New_Data_DF = pd.read_csv(file_path)
-cells = New_Data_DF['cell_name'].unique().tolist()
-#for cell in cells:
-#    airtable_df = get_record({'cell_name': cell})
-data_upload(New_Data_DF)
-'''

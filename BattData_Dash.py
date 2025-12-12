@@ -26,7 +26,6 @@ cell_df['id'] = cell_df['Name']
 performance_df['id'] = performance_df['Name']
 performance_df.set_index('id', inplace=True, drop=False)
 cell_df.set_index('id', inplace=True, drop=False)
-filter_choices = airtable.get_filter_choices(filter_columns)
 cells_chosen = []
 cycles = []
 eis_plots = []
