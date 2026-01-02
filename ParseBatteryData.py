@@ -11,6 +11,7 @@ import electrochem as echem
 import NewareNDA
 from galvani import BioLogic
 from pypalmsens import load_session_file
+import eclabfiles as ecf
 
 #imports from this project
 import airtable
@@ -95,6 +96,7 @@ def convertdf(df, extension, filename):
         converted_df['datetime'] = df['time/s']
         converted_df['step_time'] = df['time/s']
         converted_df['cycle'] = df['cycle number'] + 1
+        converted_df['cycle'] = converted_df['cycle'].astype(int)
         converted_df['current(mA)'] = df['I/mA']
         converted_df['voltage(V)'] = df['Ecell/V']
         converted_df['charge_capacity(mAh)'] = df['Q charge/mA.h']
@@ -270,6 +272,7 @@ main function-takes files from input folder and produces:
 def main(input_path):
     cycle_data = []
     updated_cells = []
+    dataframes = []
     if os.path.isdir(input_path):
         files = os.listdir(input_path)
         for file in files:
@@ -325,7 +328,7 @@ def main(input_path):
                 mpr_file = BioLogic.MPRfile(file_path)
                 df = pd.DataFrame(mpr_file.data)
                 df.to_excel(output_path + '/' + cell_number + '_' + cycle_number + '_'
-                            + cell_tester + '_' + extra + '.xlsx', index=False)
+                                + cell_tester + '_' + extra + '.xlsx', index=False)
                 continue
             elif extension =='.mpt':
                 cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
@@ -348,8 +351,9 @@ def main(input_path):
             elif extension == '.csv':
                 if cell_tester == 'Biologic':
                     cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})
-                    df = pd.read_csv(file_path, sep=',')
-                    #df = pd.read_csv(file_path, sep=';', dtype={'cycle number': int})
+                    #df = pd.read_csv(file_path, sep=',')
+                    df = pd.read_csv(file_path, sep=';', dtype={'cycle number': int})
+                    #dataframes.append(df)
                     df = convertdf(df, extension, filename)
                 else:
                     cell_aam_wt = airtable.get_AAM_Wt({'Name': cell_number})

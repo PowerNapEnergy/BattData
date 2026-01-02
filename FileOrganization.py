@@ -26,6 +26,7 @@ def MoveFiles(Directory, Data_Repository):
                 cell_csv_path = Data_Repository + 'csv/' + cell_number
                 cell_capVplot_path = Data_Repository + 'capVplots/' + cell_number
                 cell_dqdvplot_path = Data_Repository + 'dqdvPlots/' + cell_number
+                cell_eis_path = Data_Repository + 'eis/' + cell_number
                 if extension == '.png':
                     if file_type == 'CellCapV':
                         if os.path.exists(cell_capVplot_path):
@@ -75,6 +76,12 @@ def MoveFiles(Directory, Data_Repository):
                             shutil.move(file_path, cell_csv_path)
                     else:
                         continue
+                elif extension == '.xlsx':
+                    if os.path.exists(cell_csv_path):
+                        shutil.move(file_path, cell_eis_path)
+                    else:
+                        os.mkdir(cell_eis_path)
+                        shutil.move(file_path, cell_eis_path)
 
 def Organize_eis(Repository):
     eis_folder = Repository + 'eis/'

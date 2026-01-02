@@ -220,25 +220,25 @@ def update_cyclelife(cells_chosen, cycle_life_view):
         if cycle_life_view == 'Cell Capacity':
             fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['Cell_Discharge_Cap_mAh'],
-                                      mode='markers',
+                                      mode='lines+markers',
                                       name=cell)])
             fig.update_yaxes(title='Cell Capacity(mAh)')
         elif cycle_life_view == 'Specific Capacity':
             fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['AAM_Discharge_Cap_mAh/g'],
-                                      mode='markers',
+                                      mode='lines+markers',
                                       name=cell)])
             fig.update_yaxes(title='Specific Capacity (mAh/g)')
         elif cycle_life_view == 'Retention':
             fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['Retention_AF'],
-                                      mode='markers',
+                                      mode='lines+markers',
                                       name=cell)])
             fig.update_yaxes(title='Capacity Retention(%)')
         elif cycle_life_view == 'Efficiency':
             fig.add_traces([go.Scatter(x=cycle_life['Cycle#'],
                                       y=cycle_life['Coulombic_Efficiency'],
-                                      mode='markers',
+                                      mode='lines+markers',
                                       name=cell)])
             fig.update_yaxes(title='Coulombic Efficiency(%)')
     fig.update_xaxes(title='Cycle#')
@@ -425,11 +425,11 @@ def update_single_cycle(cells_chosen, selected_cycles, cycle_view, dqdv_div, dqd
                     fig.add_traces([go.Scatter(x=discharge['discharge_capacity(mAh)'],
                                                y=discharge['voltage(V)'],
                                                mode='lines',
-                                               name=cell + '_Discharge'),
+                                               name=cell + '_' + cycle_number + '_Discharge'),
                                     go.Scatter(x=charge['charge_capacity(mAh)'],
                                                y=charge['voltage(V)'],
                                                mode='lines',
-                                               name=cell + '_Charge')])
+                                               name=cell + '_' + cycle_number + '_Charge')])
                     fig.update_xaxes(title='Cell Capacity (mAh)')
                 elif cycle_view == 'Specific Capacity vs Voltage':
                     cell_aam_wt = airtable.get_AAM_Wt({'Name': cell})
@@ -438,21 +438,21 @@ def update_single_cycle(cells_chosen, selected_cycles, cycle_view, dqdv_div, dqd
                     fig.add_traces([go.Scatter(x=specific_discharge,
                                                y=discharge['voltage(V)'],
                                                mode='lines',
-                                               name=cell + '_Discharge'),
+                                               name=cell + '_' + cycle_number + '_Discharge'),
                                     go.Scatter(x=specific_charge,
                                                y=charge['voltage(V)'],
                                                mode='lines',
-                                               name=cell + '_Charge')])
+                                               name=cell + '_' + cycle_number + '_Charge')])
                     fig.update_xaxes(title='Specific Capacity(mAh/g)')
                 elif cycle_view == 'Time vs Voltage':
                     fig.add_traces([go.Scatter(x=discharge_time,
                                                y=discharge['voltage(V)'],
                                                mode='lines',
-                                               name=cell + '_Discharge'),
+                                               name=cell + '_' + cycle_number + '_Discharge'),
                                    go.Scatter(x=charge_time,
                                               y=charge['voltage(V)'],
                                               mode='lines',
-                                              name=cell + '_Charge')])
+                                              name=cell + '_' + cycle_number + '_Charge')])
                     fig.update_xaxes(title='Step Time (s)', nticks=20)
                 elif cycle_view == 'dQ/dV':
                     fig.add_traces([go.Scatter(x=dqdv_discharge['voltage(V)'],

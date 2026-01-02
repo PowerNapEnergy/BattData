@@ -8,6 +8,7 @@ NewareNDA
 pyairtable
 dotenv
 dash
-openpyxl
+openpyxlpi
 galvani
 pypalmsens
+eclabfiles
